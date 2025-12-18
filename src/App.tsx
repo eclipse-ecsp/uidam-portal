@@ -22,7 +22,6 @@ import CssBaseline from '@mui/material/CssBaseline';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 // ReactQueryDevtools removed - no floating debug icon needed
 import { Provider } from 'react-redux';
-import { Toaster } from 'react-hot-toast';
 
 import { store } from '@store/index';
 import { useTheme } from '@hooks/useTheme';
@@ -92,17 +91,6 @@ const AppContent: React.FC = () => {
           </Routes>
         </React.Suspense>
       </Router>
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          duration: 4000,
-          style: {
-            background: theme.palette.background.paper,
-            color: theme.palette.text.primary,
-            border: `1px solid ${theme.palette.divider}`,
-          },
-        }}
-      />
     </ThemeProvider>
   );
 };
