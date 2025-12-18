@@ -2,7 +2,7 @@ name: License Compliance
 
 on:
   push:
-    branches: [ "ci-workflow", "main" ]
+    branches: [ "1.9-portal", "main" ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
