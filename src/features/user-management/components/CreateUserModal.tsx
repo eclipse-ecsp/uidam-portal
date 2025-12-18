@@ -269,7 +269,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
     if (!formData.email.trim()) newErrors.email = 'Email is required';
     if (!formData.userName.trim()) newErrors.userName = 'Username is required';
     
-    if (!formData.password) newErrors.password = 'Password is required'; // NOSONAR - This is form validation, not a hard-coded password
+    if (!formData.password) newErrors.password = 'Password is required'; // NOSONAR (typescript:S2068) - This is form validation checking for empty input, not a hard-coded credential
     if (!formData.confirmPassword) newErrors.confirmPassword = 'Confirm password is required';
 
     // Email validation - Using simple regex to avoid ReDoS vulnerability
@@ -280,11 +280,11 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
     }
 
     if (formData.password && formData.password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters long'; // NOSONAR - Validating password length, not hard-coded credential
+      newErrors.password = 'Password must be at least 8 characters long'; // NOSONAR (typescript:S2068) - Validating password length requirement, not a hard-coded credential
     }
 
     if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match'; // NOSONAR - Comparing user inputs, not hard-coded values
+      newErrors.confirmPassword = 'Passwords do not match'; // NOSONAR (typescript:S2068) - Comparing user input fields, not hard-coded values
     }
 
     // Username validation (no spaces, special characters)

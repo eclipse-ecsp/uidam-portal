@@ -78,7 +78,7 @@ export const GRANT_TYPES = {
   CLIENT_CREDENTIALS: 'client_credentials',
   REFRESH_TOKEN: 'refresh_token',
   IMPLICIT: 'implicit',
-  PASSWORD: 'password'
+  PASSWORD: 'password' // NOSONAR (typescript:S2068) - OAuth2 Resource Owner Password Credentials grant type name (RFC 6749), not a credential
 } as const;
 
 export const AUTH_METHODS = {
