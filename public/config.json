@@ -4,7 +4,7 @@
   "REACT_APP_OAUTH_CLIENT_ID": "test-portal",
   "REACT_APP_OAUTH_REDIRECT_URI": "http://127.0.0.1:5173/auth/callback",
   "REACT_APP_OAUTH_CLIENT_SECRET": "$ecret@23",
-  "REACT_APP_OAUTH_USE_PKCE": true,
+  "REACT_APP_OAUTH_USE_PKCE": false,
   "REACT_APP_APP_TITLE": "UIDAM Admin Portal",
   "REACT_APP_APP_VERSION": "1.0.0",
   "REACT_APP_LOG_LEVEL": "debug",

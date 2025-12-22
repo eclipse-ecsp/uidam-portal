@@ -45,16 +45,35 @@ cd uidam-portal
 npm install
 ```
 
-3. Configure environment variables:
-```bash
-cp .env.example .env
+3. Configure the application:
+
+**Required OAuth Configuration:**
+
+Before configuring the portal, you must register it as an OAuth2 client in the UIDAM Authorization Server. During registration, you will receive:
+- `REACT_APP_OAUTH_CLIENT_ID` - The client ID for your portal application
+- `REACT_APP_OAUTH_CLIENT_SECRET` - The client secret for your portal application
+
+**Important:** When registering the OAuth2 client in UIDAM, you must configure the redirect URI (callback URL). This should match the value you set for `REACT_APP_OAUTH_REDIRECT_URI` in your portal configuration.
+
+Edit the `public/config.json` file with your configuration:
+```json
+{
+  "REACT_APP_UIDAM_AUTH_SERVER_URL": "https://your-auth-server:9443",
+  "REACT_APP_UIDAM_USER_MANAGEMENT_URL": "https://your-user-mgmt:8080",
+  "REACT_APP_OAUTH_CLIENT_ID": "your-client-id-from-registration",
+  "REACT_APP_OAUTH_CLIENT_SECRET": "your-client-secret-from-registration",
+  "REACT_APP_OAUTH_REDIRECT_URI": "http://localhost:5173/auth/callback"
+}
 ```
 
-Edit `.env` file with your UIDAM backend service URLs:
-```
-VITE_USER_MANAGEMENT_API=http://localhost:8080/api
-VITE_AUTH_SERVER_URL=http://localhost:9443
-```
+**Required Configuration Parameters:**
+- `REACT_APP_UIDAM_AUTH_SERVER_URL`: URL of the UIDAM Authorization Server
+- `REACT_APP_UIDAM_USER_MANAGEMENT_URL`: URL of the UIDAM User Management service
+- `REACT_APP_OAUTH_CLIENT_ID`: Client ID obtained after registering the portal in the UIDAM system
+- `REACT_APP_OAUTH_CLIENT_SECRET`: Client secret obtained after registering the portal in the UIDAM system
+- `REACT_APP_OAUTH_REDIRECT_URI`: Callback URL endpoint for OAuth authentication. Must match the redirect URI configured during client registration in UIDAM
+
+**Note:** For development, the redirect URI is typically `http://localhost:5173/auth/callback`. For production deployments, update this to match your production URL (e.g., `https://your-portal-domain.com/auth/callback`).
 
 ### Running Locally
 
@@ -77,6 +96,8 @@ npm run preview
 
 ### Running with Docker
 
+#### Building and Running
+
 1. Build the Docker image:
 ```bash
 docker build -t uidam-portal:latest .
@@ -88,6 +109,11 @@ docker run -p 8080:80 uidam-portal:latest
 ```
 
 The application will be available at `http://localhost:8080`
+
+**Important for Docker Deployment:**
+- Update the `public/config.json` file before building the Docker image with your production configuration
+- Ensure `REACT_APP_OAUTH_REDIRECT_URI` matches your production deployment URL (e.g., `http://your-domain:8080/auth/callback`)
+- The redirect URI configured here must match the one registered in the UIDAM Authorization Server for your OAuth2 client
 
 ### Running the Tests
 
@@ -155,22 +181,11 @@ UIDAM Portal provides comprehensive management capabilities for:
 - Configure scope permissions
 - Associate scopes with clients and roles
 
-### Client Management
-- Register OAuth2 clients
-- Configure client credentials
-- Manage client scopes and grants
-- Monitor client activity
 
 ### User Approval Workflow
 - Review and approve new user registrations
 - Manage pending user requests
-- Configure approval policies
 
-### Dashboard
-- View system overview
-- Monitor key metrics
-- Track recent activities
-- Generate reports
 
 ## Architecture
 
@@ -253,8 +268,13 @@ For questions and support, please open an issue on the [GitHub issue tracker](ht
 
 #### Cannot connect to backend services
 - Verify that UIDAM User Management and Authorization Server are running
-- Check the API URLs in your `.env` file
+- Check the API URLs in your `public/config.json` file
 - Ensure CORS is properly configured on backend services
+
+#### OAuth/Authentication Issues
+- Verify that `REACT_APP_OAUTH_CLIENT_ID` and `REACT_APP_OAUTH_CLIENT_SECRET` are correctly set from your UIDAM client registration
+- Ensure `REACT_APP_OAUTH_REDIRECT_URI` in `public/config.json` matches exactly with the redirect URI configured during OAuth2 client registration in UIDAM
+- Check that the redirect URI matches your deployment environment (localhost for dev, production domain for production)
 
 #### Build fails
 - Run `npm run type-check` to identify TypeScript errors
