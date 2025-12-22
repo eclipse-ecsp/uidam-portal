@@ -2,7 +2,7 @@ name: Build
 
 on:
   push:
-    branches: ["1.9-portal", "main" ]
+    branches: ["main" ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
