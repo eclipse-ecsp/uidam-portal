@@ -49,7 +49,7 @@
   "devDependencies": {
     "@eclipse-dash/nodejs-wrapper": "^0.0.1",
     "@storybook/addon-essentials": "^7.6.3",
-    "@storybook/react": "^7.6.3",
+    "@storybook/react": "^10.1.10",
     "@storybook/react-vite": "^7.6.3",
     "@testing-library/jest-dom": "^6.1.6",
     "@testing-library/react": "^14.1.2",
