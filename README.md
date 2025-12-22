@@ -49,7 +49,7 @@ npm install
 
 **Required OAuth Configuration:**
 
-Before configuring the portal, you must register it as an OAuth2 client in the UIDAM Authorization Server. During registration, you will receive:
+Before configuring the portal, you must register it as an OAuth2 client in the UIDAM System. During registration, you will receive:
 - `REACT_APP_OAUTH_CLIENT_ID` - The client ID for your portal application
 - `REACT_APP_OAUTH_CLIENT_SECRET` - The client secret for your portal application
 
@@ -112,8 +112,8 @@ The application will be available at `http://localhost:8080`
 
 **Important for Docker Deployment:**
 - Update the `public/config.json` file before building the Docker image with your production configuration
-- Ensure `REACT_APP_OAUTH_REDIRECT_URI` matches your production deployment URL (e.g., `http://your-domain:8080/auth/callback`)
-- The redirect URI configured here must match the one registered in the UIDAM Authorization Server for your OAuth2 client
+- Ensure `REACT_APP_OAUTH_REDIRECT_URI` matches your deployment URL (e.g., `http://your-domain:8080/auth/callback`)
+- The redirect URI configured here must match the one registered in the UIDAM System for your OAuth2 client
 
 ### Running the Tests
 
