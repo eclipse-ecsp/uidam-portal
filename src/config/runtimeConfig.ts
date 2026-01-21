@@ -29,6 +29,7 @@ export interface RuntimeConfig {
   KEYCLOAK_REALM?: string;
   KEYCLOAK_CLIENT_ID?: string;
   API_BASE_URL?: string;
+  REACT_APP_OAUTH_POST_LOGOUT_REDIRECT_URI?: string;
   [key: string]: any;
 }
 

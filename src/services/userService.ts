@@ -470,10 +470,57 @@ export class UserService {
    * @returns {Promise<ApiResponse<User>>} The API response containing the current user's details
    */
   static async getSelfUser(): Promise<ApiResponse<User>> {
+    const token = localStorage.getItem('uidam_admin_token');
+    
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+
+    // Decode JWT token to extract user_id
+    let userId: string | null = null;
+    try {
+      // JWT tokens have 3 parts separated by dots: header.payload.signature
+      const tokenParts = token.split('.');
+      if (tokenParts.length === 3) {
+        // Decode the payload (middle part)
+        const payload = tokenParts[1];
+        const decodedPayload = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+        const claims = JSON.parse(decodedPayload);
+        
+        // Extract user_id from the token claims
+        userId = claims.user_id;
+        console.log('Decoded user_id from token:', userId);
+      }
+    } catch (error) {
+      console.error('Failed to decode JWT token:', error);
+    }
+
+    // Build headers
+    const baseHeaders = getApiHeaders();
+    const headers: Record<string, string> = {};
+    
+    // Copy headers from baseHeaders
+    if (baseHeaders instanceof Headers) {
+      baseHeaders.forEach((value, key) => {
+        headers[key] = value;
+      });
+    } else if (typeof baseHeaders === 'object' && !Array.isArray(baseHeaders)) {
+      Object.assign(headers, baseHeaders);
+    }
+
+    // Add user-id header if we successfully decoded it
+    if (userId) {
+      headers['user-id'] = userId;
+      console.log('Added user-id header:', userId);
+    } else {
+      console.warn('Could not extract user_id from token');
+    }
+
     const response = await fetch(`${API_CONFIG.API_BASE_URL}/v1/users/self`, {
       method: 'GET',
-      headers: getApiHeaders(),
+      headers: headers,
     });
+    
     return response.json();
   }
 
@@ -483,9 +530,46 @@ export class UserService {
    * @returns {Promise<ApiResponse<User>>} The API response containing the updated user details
    */
   static async updateSelfUser(patches: any[]): Promise<ApiResponse<User>> {
+    const token = localStorage.getItem('uidam_admin_token');
+    
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+
+    // Decode JWT token to extract user_id
+    let userId: string | null = null;
+    try {
+      const tokenParts = token.split('.');
+      if (tokenParts.length === 3) {
+        const payload = tokenParts[1];
+        const decodedPayload = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+        const claims = JSON.parse(decodedPayload);
+        userId = claims.user_id;
+      }
+    } catch (error) {
+      console.error('Failed to decode JWT token:', error);
+    }
+
+    // Build headers
+    const baseHeaders = getApiHeaders();
+    const headers: Record<string, string> = {};
+    
+    if (baseHeaders instanceof Headers) {
+      baseHeaders.forEach((value, key) => {
+        headers[key] = value;
+      });
+    } else if (typeof baseHeaders === 'object' && !Array.isArray(baseHeaders)) {
+      Object.assign(headers, baseHeaders);
+    }
+
+    // Add user-id header
+    if (userId) {
+      headers['user-id'] = userId;
+    }
+
     const response = await fetch(`${API_CONFIG.API_BASE_URL}/v1/users/self`, {
       method: 'PATCH',
-      headers: getApiHeaders(),
+      headers: headers,
       body: JSON.stringify(patches),
     });
     return response.json();
@@ -497,7 +581,7 @@ export class UserService {
    * @returns {Promise<ApiResponse<User>>} The API response confirming self-deletion
    */
   static async deleteSelfUser(externalUser?: boolean): Promise<ApiResponse<User>> {
-    let urlPath = `${API_CONFIG.API_BASE_URL}/v1/users/self`;
+    let urlPath = `${API_CONFIG.API_BASE_URL}/v2/users/self`;
     if (externalUser !== undefined) {
       urlPath += `?external_user=${externalUser}`;
     }
