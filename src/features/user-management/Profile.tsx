@@ -243,7 +243,7 @@ const Profile: React.FC = () => {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom sx={{ mb: 3, fontWeight: 600 }}>
+      <Typography variant="h4" gutterBottom sx={{ fontWeight: 600, mb: 3 }}>
         My Profile
       </Typography>
 

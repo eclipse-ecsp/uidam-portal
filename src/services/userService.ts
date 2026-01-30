@@ -638,6 +638,102 @@ export class UserService {
     });
     return response.json();
   }
+
+  // Password Management
+  /**
+   * Request password reset for the current user
+   * Sends an email with password reset link
+   * @returns {Promise<ApiResponse<string>>} Success message
+   * @throws {Error} If password reset request fails
+   */
+  static async requestPasswordReset(): Promise<ApiResponse<string>> {
+    const token = localStorage.getItem('uidam_admin_token');
+    
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+
+    // Decode JWT token to extract user_id
+    let userId: string | null = null;
+    try {
+      const tokenParts = token.split('.');
+      if (tokenParts.length === 3) {
+        const payload = tokenParts[1];
+        const decodedPayload = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+        const claims = JSON.parse(decodedPayload);
+        userId = claims.user_id;
+        console.log('Decoded user_id from token for password reset:', userId);
+      }
+    } catch (error) {
+      console.error('Failed to decode JWT token:', error);
+    }
+
+    // Build headers with user-id
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (userId) {
+      headers['user-id'] = userId;
+      console.log('Added user-id header for password reset:', userId);
+    } else {
+      console.warn('Could not extract user_id from token for password reset');
+      throw new Error('Failed to extract user ID from authentication token');
+    }
+
+    const response = await fetchWithTokenRefresh(
+      `${API_CONFIG.API_BASE_URL}/v1/users/self/recovery/resetpassword`,
+      {
+        method: 'POST',
+        headers: headers,
+      }
+    );
+
+    if (!response.ok) {
+      let errorMessage = 'Failed to initiate password reset';
+      
+      try {
+        const errorData = await response.json();
+        console.error('Password reset request failed:', response.status, errorData);
+        
+        // Check for specific error messages from backend
+        if (errorData.message) {
+          if (errorData.message.includes('Mail server connection failed') || 
+              errorData.message.includes('SMTP') || 
+              errorData.message.includes('smtp.gmail.com')) {
+            errorMessage = 'Email service is temporarily unavailable. Please contact your system administrator or try again later.';
+          } else if (errorData.code === 'INTERNAL_SERVER_ERROR') {
+            errorMessage = 'Server error occurred. Please contact your system administrator.';
+          } else {
+            errorMessage = errorData.message;
+          }
+        } else if (response.status === 429) {
+          errorMessage = 'Too many password reset requests. Please try again later.';
+        } else if (response.status === 404) {
+          errorMessage = 'User account not found.';
+        } else if (response.status === 400) {
+          errorMessage = 'Invalid request. Please try again.';
+        }
+      } catch (parseError) {
+        // If response is not JSON, try to get text
+        console.error('Failed to parse error response:', parseError);
+        if (response.status === 429) {
+          errorMessage = 'Too many password reset requests. Please try again later.';
+        } else if (response.status === 404) {
+          errorMessage = 'User account not found.';
+        } else if (response.status === 400) {
+          errorMessage = 'Invalid request. Please try again.';
+        } else if (response.status === 500) {
+          errorMessage = 'Server error occurred. Please contact your system administrator.';
+        }
+      }
+      
+      throw new Error(errorMessage);
+    }
+
+    const result = await response.json();
+    return result;
+  }
 }
 
 export default UserService;

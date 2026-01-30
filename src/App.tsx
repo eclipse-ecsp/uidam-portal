@@ -41,6 +41,7 @@ const ClientManagement = React.lazy(() => import('@features/client-management/Cl
 const Assistant = React.lazy(() => import('@features/assistant/Assistant'));
 const Login = React.lazy(() => import('@features/auth/Login'));
 const AuthCallback = React.lazy(() => import('@features/auth/AuthCallback'));
+const ChangePassword = React.lazy(() => import('@features/auth/ChangePassword'));
 
 // Create a query client
 const queryClient = new QueryClient({
@@ -77,6 +78,7 @@ const AppContent: React.FC = () => {
                       <Route path="/" element={<Navigate to="/dashboard" replace />} />
                       <Route path="/dashboard" element={<Dashboard />} />
                       <Route path="/profile" element={<Profile />} />
+                      <Route path="/change-password" element={<ChangePassword />} />
                       <Route path="/users/*" element={<UserManagement />} />
                       <Route path="/accounts/*" element={<AccountManagement />} />
                       <Route path="/roles/*" element={<RoleManagement />} />

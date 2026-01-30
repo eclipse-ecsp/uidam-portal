@@ -46,6 +46,7 @@ import {
   Logout,
   LightMode,
   DarkMode,
+  LockReset as LockResetIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
@@ -401,6 +402,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <AccountCircle fontSize="small" />
               </ListItemIcon>
               Profile
+            </MenuItem>
+            <MenuItem onClick={() => { handleMenuClose(); navigate('/change-password'); }}>
+              <ListItemIcon>
+                <LockResetIcon fontSize="small" />
+              </ListItemIcon>
+              Change Password
             </MenuItem>
             <MenuItem onClick={handleLogout}>
               <ListItemIcon>
