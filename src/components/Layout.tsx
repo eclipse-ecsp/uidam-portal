@@ -47,6 +47,7 @@ import {
   Logout,
   LightMode,
   DarkMode,
+  LockReset,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
@@ -139,6 +140,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const handleLogout = () => {
     dispatch(logout());
     navigate('/login');
+    handleMenuClose();
+  };
+
+  const handleSecuritySettings = () => {
+    navigate('/profile/security');
     handleMenuClose();
   };
 
@@ -346,6 +352,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <Settings fontSize="small" />
               </ListItemIcon>
               Settings
+            </MenuItem>
+            <MenuItem onClick={handleSecuritySettings}>
+              <ListItemIcon>
+                <LockReset fontSize="small" />
+              </ListItemIcon>
+              Security Settings
             </MenuItem>
             <MenuItem onClick={handleLogout}>
               <ListItemIcon>

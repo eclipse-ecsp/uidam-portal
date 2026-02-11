@@ -28,6 +28,7 @@ export const FEATURE_FLAGS = {
   CLIENT_MANAGEMENT: true,
   AUDIT_LOGS: true,
   REAL_TIME_UPDATES: true,
+  SELF_SERVICE_PASSWORD_RECOVERY: true,
 } as const;
 
 // API Configuration

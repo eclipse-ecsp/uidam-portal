@@ -22,6 +22,13 @@
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
+interface CorrelationMetadata {
+  correlationId?: string;
+  traceId?: string;
+  spanId?: string;
+  [key: string]: any;
+}
+
 export const logger = {
   /**
    * Log debug information (only in development)
@@ -56,5 +63,26 @@ export const logger = {
    */
   error: (...args: unknown[]): void => {
     console.error('[ERROR]', ...args);
+  },
+
+  /**
+   * Log password recovery events with correlation metadata
+   * Captures snackbar payload metadata for observability
+   */
+  logPasswordRecoveryEvent: (
+    event: 'initiated' | 'success' | 'error',
+    metadata: CorrelationMetadata
+  ): void => {
+    const logData = {
+      event: `password_recovery_${event}`,
+      timestamp: new Date().toISOString(),
+      ...metadata,
+    };
+
+    if (event === 'error') {
+      logger.error('Password Recovery Event:', logData);
+    } else {
+      logger.info('Password Recovery Event:', logData);
+    }
   },
 };

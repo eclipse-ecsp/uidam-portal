@@ -40,6 +40,7 @@ const ClientManagement = React.lazy(() => import('@features/client-management/Cl
 const Assistant = React.lazy(() => import('@features/assistant/Assistant'));
 const Login = React.lazy(() => import('@features/auth/Login'));
 const AuthCallback = React.lazy(() => import('@features/auth/AuthCallback'));
+const PasswordRecoveryPage = React.lazy(() => import('@features/self-service/password-recovery/PasswordRecoveryPage'));
 
 // Create a query client
 const queryClient = new QueryClient({
@@ -82,6 +83,7 @@ const AppContent: React.FC = () => {
                       <Route path="/approvals/*" element={<ApprovalWorkflow />} />
                       <Route path="/clients/*" element={<ClientManagement />} />
                       <Route path="/assistant" element={<Assistant />} />
+                      <Route path="/profile/security" element={<PasswordRecoveryPage />} />
                       <Route path="*" element={<Navigate to="/dashboard" replace />} />
                     </Routes>
                   </Layout>

@@ -85,6 +85,11 @@ export interface UserFilterRequest {
   createdBefore?: string;
 }
 
+// Self-Service Password Recovery Types
+export interface SelfUserPasswordRecoveryResponseV1 {
+  message: string;
+}
+
 export enum UserStatus {
   PENDING = 'PENDING',
   BLOCKED = 'BLOCKED',

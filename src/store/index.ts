@@ -19,6 +19,9 @@ import { configureStore } from '@reduxjs/toolkit';
 import { authSlice } from './slices/authSlice';
 import { uiSlice } from './slices/uiSlice';
 
+// Re-export auth selectors for convenience
+export { selectAuthUser, selectAuthUserEmail, selectIsAuthenticated } from './slices/authSlice';
+
 export const store = configureStore({
   reducer: {
     auth: authSlice.reducer,

@@ -73,6 +73,11 @@ jest.mock('@features/auth/AuthCallback', () => ({
   default: () => <div>Auth Callback Component</div>,
 }));
 
+jest.mock('@features/self-service/password-recovery/PasswordRecoveryPage', () => ({
+  __esModule: true,
+  default: () => <div>Password Recovery Page</div>,
+}));
+
 // Mock Layout component
 jest.mock('@components/Layout', () => ({
   __esModule: true,
@@ -229,5 +234,23 @@ describe.skip('App', () => {
   it('exports App as default', () => {
     expect(App).toBeDefined();
     expect(typeof App).toBe('function');
+  });
+
+  it('renders password recovery page at /profile/security route for authenticated users', async () => {
+    const store = createMockStore(true);
+    
+    // Mock window.location.pathname
+    delete (window as any).location;
+    window.location = { pathname: '/profile/security' } as any;
+
+    render(
+      <Provider store={store}>
+        <App />
+      </Provider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Password Recovery Page')).toBeInTheDocument();
+    });
   });
 });

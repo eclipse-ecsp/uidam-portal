@@ -18,8 +18,9 @@
 // User Management Service
 // Comprehensive API integration for UIDAM User Management APIs
 
-import { API_CONFIG } from '../config/app.config';
+import { API_CONFIG } from '@config/app.config';
 import { handleApiResponse, getApiHeaders } from './apiUtils';
+import type { SelfUserPasswordRecoveryResponseV1 } from '@/types';
 
 // API Response interfaces
 export interface ApiResponse<T> {
@@ -544,7 +545,7 @@ export class UserService {
    * @returns {Promise<ApiResponse<any>>} The API response containing the user details
    */
   static async getUserByUserName(userName: string, accountName?: string): Promise<ApiResponse<any>> {
-    let urlPath = `/v1/users/${userName}/byUserName`;
+    let urlPath = `${API_CONFIG.API_BASE_URL}/v1/users/${userName}/byUserName`;
     if (accountName) {
       urlPath += `?accountName=${accountName}`;
     }
@@ -568,6 +569,19 @@ export class UserService {
       method: 'POST',
       headers: getApiHeaders(),
       body: JSON.stringify(event),
+    });
+    return response.json();
+  }
+
+  /**
+   * Initiates self-service password recovery for the authenticated user
+   * Triggers backend notification email with password reset link
+   * @returns {Promise<ApiResponse<SelfUserPasswordRecoveryResponseV1>>} The API response confirming recovery initiation
+   */
+  static async postSelfRecoveryForgotPassword(): Promise<ApiResponse<SelfUserPasswordRecoveryResponseV1>> {
+    const response = await fetch(`${API_CONFIG.API_BASE_URL}/v1/users/self/recovery/forgot-password`, {
+      method: 'POST',
+      headers: getApiHeaders(),
     });
     return response.json();
   }
