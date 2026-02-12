@@ -51,6 +51,7 @@ import {
   Block as BlockIcon,
   Email as EmailIcon,
   ManageAccounts as ManageAccountsIcon,
+  FilterList as FilterListIcon,
 } from '@mui/icons-material';
 import ManagementLayout from '../../components/shared/ManagementLayout';
 import { StyledTableHead, StyledTableCell, StyledTableRow } from '../../components/shared/StyledTableComponents';
@@ -66,6 +67,7 @@ const UserManagement: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [totalUsers, setTotalUsers] = useState(0);
@@ -99,6 +101,11 @@ const UserManagement: React.FC = () => {
       if (searchTerm?.trim()) {
         const search = searchTerm.trim();
         filter.userNames = [search];
+      }
+      
+      // Add status filter if selected
+      if (statusFilter) {
+        filter.status = [statusFilter as 'PENDING' | 'BLOCKED' | 'REJECTED' | 'ACTIVE' | 'DELETED' | 'DEACTIVATED'];
       }
 
       const searchParams: UserSearchParams = {
@@ -189,7 +196,7 @@ const UserManagement: React.FC = () => {
         setLoading(false);
       }, remainingTime);
     }
-  }, [page, rowsPerPage, searchTerm]);
+  }, [page, rowsPerPage, searchTerm, statusFilter]);
 
   useEffect(() => {
     loadUsers();
@@ -343,21 +350,49 @@ const UserManagement: React.FC = () => {
       >
         {/* Search and Actions */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <TextField
-            placeholder="Search users by name, username, or email..."
-            variant="outlined"
-            size="small"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
-            }}
-            sx={{ minWidth: 400 }}
-          />
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flex: 1 }}>
+            <TextField
+              placeholder="Search users by name, username, or email..."
+              variant="outlined"
+              size="small"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ minWidth: 400 }}
+            />
+            <TextField
+              select
+              placeholder="Filter by status"
+              variant="outlined"
+              size="small"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <FilterListIcon />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ minWidth: 200 }}
+              SelectProps={{
+                displayEmpty: true,
+              }}
+            >
+              <MenuItem value="">All Status</MenuItem>
+              <MenuItem value="ACTIVE">Active</MenuItem>
+              <MenuItem value="PENDING">Pending</MenuItem>
+              <MenuItem value="BLOCKED">Blocked</MenuItem>
+              <MenuItem value="REJECTED">Rejected</MenuItem>
+              <MenuItem value="DEACTIVATED">Deactivated</MenuItem>
+            </TextField>
+          </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Button
               variant="contained"
