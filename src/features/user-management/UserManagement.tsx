@@ -51,6 +51,7 @@ import {
   Block as BlockIcon,
   Email as EmailIcon,
   ManageAccounts as ManageAccountsIcon,
+  FilterList as FilterListIcon,
 } from '@mui/icons-material';
 import ManagementLayout from '../../components/shared/ManagementLayout';
 import { StyledTableHead, StyledTableCell, StyledTableRow } from '../../components/shared/StyledTableComponents';
@@ -66,8 +67,9 @@ const UserManagement: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('');
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalUsers, setTotalUsers] = useState(0);
   const [snackbar, setSnackbar] = useState({ 
     open: false, 
@@ -100,6 +102,11 @@ const UserManagement: React.FC = () => {
         const search = searchTerm.trim();
         filter.userNames = [search];
       }
+      
+      // Add status filter if selected
+      if (statusFilter) {
+        filter.status = [statusFilter as 'PENDING' | 'BLOCKED' | 'REJECTED' | 'ACTIVE' | 'DELETED' | 'DEACTIVATED'];
+      }
 
       const searchParams: UserSearchParams = {
         pageNumber: page,
@@ -112,15 +119,58 @@ const UserManagement: React.FC = () => {
 
       try {
         // Call the real API
-        const users = await UserService.filterUsersV2(filter, searchParams);
+        const response = await UserService.filterUsersV2(filter, searchParams);
+        console.log('API Response:', response);
         
-        if (Array.isArray(users)) {
-          setUsers(users);
-          setTotalUsers(users.length);
-        } else {
-          console.warn('Unexpected response format:', users);
-          throw new Error('Invalid response format');
+        // Handle different response formats
+        let usersList: User[] = [];
+        
+        if (Array.isArray(response)) {
+          // Direct array response
+          usersList = response;
+        } else if (response && typeof response === 'object' && 'data' in response) {
+          const dataResponse = response as { data?: unknown };
+          if (Array.isArray(dataResponse.data)) {
+            // Wrapped in data property
+            usersList = dataResponse.data as User[];
+          }
         }
+        // Always set users state with the processed list (empty array if no data)
+        // This ensures consistent state management regardless of API response format
+        setUsers(usersList);
+        
+        // For V1 API without total count, fetch total separately with large pageSize
+        // or use a separate API call. For now, we'll request a large pageSize to get approximate total
+        if (usersList.length === rowsPerPage) {
+          // Likely there are more records, make a call without pagination to get total
+          try {
+            const totalResponse = await UserService.filterUsersV2(filter, {
+              ...searchParams,
+              pageNumber: 0,
+              pageSize: 10000 // Large number to get all records for count
+            });
+            
+            let totalList: User[] = [];
+            if (Array.isArray(totalResponse)) {
+              totalList = totalResponse;
+            } else if (totalResponse && typeof totalResponse === 'object' && 'data' in totalResponse) {
+              const dataResponse = totalResponse as { data?: unknown };
+              if (Array.isArray(dataResponse.data)) {
+                totalList = dataResponse.data as User[];
+              }
+            }
+            
+            setTotalUsers(totalList.length);
+          } catch (error) {
+            console.error('Failed to get total count:', error);
+            setTotalUsers(usersList.length);
+          }
+        } else {
+          // Current page has fewer records than pageSize, so this is likely the last/only page
+          setTotalUsers(page * rowsPerPage + usersList.length);
+        }
+        
+        console.log('Users loaded:', usersList.length);
       } catch (apiError) {
         console.error('API call failed:', apiError);
         setSnackbar({ 
@@ -150,7 +200,7 @@ const UserManagement: React.FC = () => {
         setLoading(false);
       }, remainingTime);
     }
-  }, [page, rowsPerPage, searchTerm]);
+  }, [page, rowsPerPage, searchTerm, statusFilter]);
 
   useEffect(() => {
     loadUsers();
@@ -304,21 +354,49 @@ const UserManagement: React.FC = () => {
       >
         {/* Search and Actions */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <TextField
-            placeholder="Search users by name, username, or email..."
-            variant="outlined"
-            size="small"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
-            }}
-            sx={{ minWidth: 400 }}
-          />
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flex: 1 }}>
+            <TextField
+              placeholder="Search users by name, username, or email..."
+              variant="outlined"
+              size="small"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ minWidth: 400 }}
+            />
+            <TextField
+              select
+              placeholder="Filter by status"
+              variant="outlined"
+              size="small"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <FilterListIcon />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ minWidth: 200 }}
+              SelectProps={{
+                displayEmpty: true,
+              }}
+            >
+              <MenuItem value="">All Status</MenuItem>
+              <MenuItem value="ACTIVE">Active</MenuItem>
+              <MenuItem value="PENDING">Pending</MenuItem>
+              <MenuItem value="BLOCKED">Blocked</MenuItem>
+              <MenuItem value="REJECTED">Rejected</MenuItem>
+              <MenuItem value="DEACTIVATED">Deactivated</MenuItem>
+            </TextField>
+          </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Button
               variant="contained"
@@ -429,7 +507,7 @@ const UserManagement: React.FC = () => {
 
         {/* Pagination */}
         <TablePagination
-          rowsPerPageOptions={[10, 25, 50, 100]}
+          rowsPerPageOptions={[5, 10, 25, 50, 100]}
           component="div"
           count={totalUsers}
           rowsPerPage={rowsPerPage}

@@ -36,7 +36,8 @@ export const API_CONFIG = {
     return getConfig().REACT_APP_UIDAM_AUTH_SERVER_URL;
   },
   get API_BASE_URL() {
-    return getConfig().REACT_APP_UIDAM_USER_MANAGEMENT_URL;
+    // Use empty string for relative URLs (Vite proxy) when not configured
+    return getConfig().REACT_APP_UIDAM_USER_MANAGEMENT_URL || '';
   },
   get API_TIMEOUT() {
     return getConfig().REACT_APP_API_TIMEOUT;
@@ -59,6 +60,9 @@ export const OAUTH_CONFIG = {
   },
   get REDIRECT_URI() {
     return getConfig().REACT_APP_OAUTH_REDIRECT_URI;
+  },
+  get POST_LOGOUT_REDIRECT_URI() {
+    return getConfig().REACT_APP_OAUTH_POST_LOGOUT_REDIRECT_URI || getConfig().REACT_APP_OAUTH_REDIRECT_URI;
   },
   get USE_PKCE() {
     return getConfig().REACT_APP_OAUTH_USE_PKCE !== false;
