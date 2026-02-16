@@ -25,7 +25,7 @@ import {
 } from '@/types';
 import { API_CONFIG } from '@/config/app.config';
 import { createResource, updateResource, deleteResource, getResource, buildQueryParams } from '@/utils/serviceHelpers';
-import { getApiHeaders } from './apiUtils';
+import { fetchWithTokenRefresh } from './apiUtils';
 
 /**
  * Service class for managing scope operations
@@ -34,9 +34,9 @@ import { getApiHeaders } from './apiUtils';
 export class ScopeService {
   /**
    * Retrieves a paginated list of scopes with optional filtering
-   * @param {FilterParams & { filter?: ScopeFilterRequest }} params - Pagination parameters and optional scope filter
-   * @returns {Promise<PaginatedResponse<Scope>>} Paginated response containing scopes
-   * @throws {Error} If the API request fails
+   * @param {Object} params Pagination parameters and optional scope filter
+   * @returns {Promise<PaginatedResponse<Scope>>} Promise resolving to paginated response containing scopes
+   * @throws Error if the API request fails
    */
   async getScopes(params: FilterParams & { filter?: ScopeFilterRequest }): Promise<PaginatedResponse<Scope>> {
     // Build filter request - backend requires scopes field even if empty
@@ -56,10 +56,9 @@ export class ScopeService {
     console.log('Scope Service - Getting scopes:', { url: finalUrl, filterRequest, correlationId });
     
     try {
-      const response = await fetch(finalUrl, {
+      const response = await fetchWithTokenRefresh(finalUrl, {
         method: 'POST',
         headers: {
-          ...getApiHeaders(),
           'X-Correlation-ID': correlationId,
         },
         body: JSON.stringify(filterRequest),
@@ -76,14 +75,43 @@ export class ScopeService {
       
       console.log('Scope Service - Success:', { resultsCount: results.length, correlationId });
       
+      // Get total count for pagination
+      let totalCount = results.length;
+      
+      // If we got a full page of results, there might be more - fetch total count
+      if (results.length === params.size) {
+        try {
+          const totalResponse = await fetchWithTokenRefresh(`${urlPath}?page=0&pageSize=10000`, {
+            method: 'POST',
+            headers: {
+              'X-Correlation-ID': crypto.randomUUID(),
+            },
+            body: JSON.stringify(filterRequest),
+          });
+          
+          if (totalResponse.ok) {
+            const totalData: { results?: Scope[] } = await totalResponse.json();
+            totalCount = (totalData.results || []).length;
+            console.log('Scope Service - Total count fetched:', totalCount);
+          }
+        } catch (error) {
+          console.warn('Scope Service - Failed to get total count, using current results:', error);
+          // If total count fetch fails, estimate based on current page
+          totalCount = params.page * params.size + results.length;
+        }
+      } else {
+        // Current page has fewer results than requested, so we know the total
+        totalCount = params.page * params.size + results.length;
+      }
+      
       return {
         content: results,
-        totalElements: results.length,
-        totalPages: Math.ceil(results.length / params.size),
+        totalElements: totalCount,
+        totalPages: Math.ceil(totalCount / params.size),
         size: params.size,
         number: params.page,
         first: params.page === 0,
-        last: params.page >= Math.ceil(results.length / params.size) - 1,
+        last: params.page >= Math.ceil(totalCount / params.size) - 1,
       };
     } catch (error: unknown) {
       console.error('Scope Service - Error details:', { error, correlationId });

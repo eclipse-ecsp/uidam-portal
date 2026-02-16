@@ -20,20 +20,18 @@ import { userManagementApi } from './api-client';
 import { handleApiError } from '@/utils/apiErrorHandler';
 import { Scope, CreateScopeRequest, UpdateScopeRequest } from '@/types';
 
-// Mock fetch globally for getScopes method
-global.fetch = jest.fn();
+// Mock apiUtils module - all exports are auto-mocked
+jest.mock('./apiUtils');
 
 // Mock userManagementApi for other methods
 jest.mock('./api-client');
 jest.mock('@/utils/apiErrorHandler');
 
-// Mock getApiHeaders
-jest.mock('./apiUtils', () => ({
-  getApiHeaders: jest.fn(() => ({
-    'Content-Type': 'application/json',
-    'Authorization': 'Bearer mock-token'
-  }))
-}));
+import { fetchWithTokenRefresh } from './apiUtils';
+const mockFetchWithTokenRefresh = fetchWithTokenRefresh as jest.MockedFunction<typeof fetchWithTokenRefresh>;
+
+// Mock fetch globally for getScopes method
+global.fetch = jest.fn();
 
 describe('ScopeService', () => {
   let scopeService: ScopeService;
@@ -74,10 +72,24 @@ describe('ScopeService', () => {
         results: mockScopes
       };
       
-      (global.fetch as jest.Mock).mockResolvedValue({
+      mockFetchWithTokenRefresh.mockResolvedValue({
         ok: true,
         json: async () => mockResponse,
-      });
+        headers: new Headers(),
+        redirected: false,
+        status: 200,
+        statusText: 'OK',
+        type: 'basic' as ResponseType,
+        url: '',
+        clone: jest.fn(),
+        body: null,
+        bodyUsed: false,
+        arrayBuffer: jest.fn(),
+        blob: jest.fn(),
+        formData: jest.fn(),
+        text: jest.fn(),
+        bytes: jest.fn(),
+      } as Response);
 
       const result = await scopeService.getScopes({
         page: 0,
@@ -93,26 +105,54 @@ describe('ScopeService', () => {
     });
 
     it('should send empty array when no filter name provided', async () => {
-      (global.fetch as jest.Mock).mockResolvedValue({
+      mockFetchWithTokenRefresh.mockResolvedValue({
         ok: true,
         json: async () => ({ results: [] }),
-      });
+        headers: new Headers(),
+        redirected: false,
+        status: 200,
+        statusText: 'OK',
+        type: 'basic' as ResponseType,
+        url: '',
+        clone: jest.fn(),
+        body: null,
+        bodyUsed: false,
+        arrayBuffer: jest.fn(),
+        blob: jest.fn(),
+        formData: jest.fn(),
+        text: jest.fn(),
+        bytes: jest.fn(),
+      } as Response);
 
       await scopeService.getScopes({
         page: 0,
         size: 10
       });
 
-      const callArgs = (global.fetch as jest.Mock).mock.calls[0];
-      const body = JSON.parse(callArgs[1].body);
+      const callArgs = mockFetchWithTokenRefresh.mock.calls[0];
+      const body = callArgs[1]?.body ? JSON.parse(callArgs[1].body as string) : {};
       expect(body).toEqual({ scopes: [] });
     });
 
     it('should send filter name in array when provided', async () => {
-      (global.fetch as jest.Mock).mockResolvedValue({
+      mockFetchWithTokenRefresh.mockResolvedValue({
         ok: true,
         json: async () => ({ results: [mockScope] }),
-      });
+        headers: new Headers(),
+        redirected: false,
+        status: 200,
+        statusText: 'OK',
+        type: 'basic' as ResponseType,
+        url: '',
+        clone: jest.fn(),
+        body: null,
+        bodyUsed: false,
+        arrayBuffer: jest.fn(),
+        blob: jest.fn(),
+        formData: jest.fn(),
+        text: jest.fn(),
+        bytes: jest.fn(),
+      } as Response);
 
       await scopeService.getScopes({
         page: 0,
@@ -120,17 +160,30 @@ describe('ScopeService', () => {
         filter: { name: 'read' }
       });
 
-      const callArgs = (global.fetch as jest.Mock).mock.calls[0];
-      const body = JSON.parse(callArgs[1].body);
+      const callArgs = mockFetchWithTokenRefresh.mock.calls[0];
+      const body = callArgs[1]?.body ? JSON.parse(callArgs[1].body as string) : {};
       expect(body).toEqual({ scopes: ['read'] });
     });
 
     it('should handle API error with handleApiError', async () => {
-      (global.fetch as jest.Mock).mockResolvedValue({
+      mockFetchWithTokenRefresh.mockResolvedValue({
         ok: false,
         status: 400,
         text: async () => 'API Error',
-      });
+        headers: new Headers(),
+        redirected: false,
+        statusText: 'Bad Request',
+        type: 'basic' as ResponseType,
+        url: '',
+        clone: jest.fn(),
+        body: null,
+        bodyUsed: false,
+        arrayBuffer: jest.fn(),
+        blob: jest.fn(),
+        formData: jest.fn(),
+        json: jest.fn(),
+        bytes: jest.fn(),
+      } as Response);
 
       await expect(scopeService.getScopes({
         page: 0,
@@ -145,26 +198,54 @@ describe('ScopeService', () => {
         name: `scope_${i + 1}`
       }));
 
-      (global.fetch as jest.Mock).mockResolvedValue({
+      mockFetchWithTokenRefresh.mockResolvedValue({
         ok: true,
         json: async () => ({ results: scopes }),
-      });
+        headers: new Headers(),
+        redirected: false,
+        status: 200,
+        statusText: 'OK',
+        type: 'basic' as ResponseType,
+        url: '',
+        clone: jest.fn(),
+        body: null,
+        bodyUsed: false,
+        arrayBuffer: jest.fn(),
+        blob: jest.fn(),
+        formData: jest.fn(),
+        text: jest.fn(),
+        bytes: jest.fn(),
+      } as Response);
 
       const result = await scopeService.getScopes({
         page: 1,
         size: 10
       });
 
-      expect(result.totalPages).toBe(4);
+      expect(result.totalPages).toBe(5);
       expect(result.last).toBe(false);
       expect(result.first).toBe(false);
     });
 
     it('should handle empty results', async () => {
-      (global.fetch as jest.Mock).mockResolvedValue({
+      mockFetchWithTokenRefresh.mockResolvedValue({
         ok: true,
         json: async () => ({ results: [] }),
-      });
+        headers: new Headers(),
+        redirected: false,
+        status: 200,
+        statusText: 'OK',
+        type: 'basic' as ResponseType,
+        url: '',
+        clone: jest.fn(),
+        body: null,
+        bodyUsed: false,
+        arrayBuffer: jest.fn(),
+        blob: jest.fn(),
+        formData: jest.fn(),
+        text: jest.fn(),
+        bytes: jest.fn(),
+      } as Response);
 
       const result = await scopeService.getScopes({
         page: 0,
@@ -176,17 +257,31 @@ describe('ScopeService', () => {
     });
 
     it('should include pagination in API call', async () => {
-      (global.fetch as jest.Mock).mockResolvedValue({
+      mockFetchWithTokenRefresh.mockResolvedValue({
         ok: true,
         json: async () => ({ results: mockScopes }),
-      });
+        headers: new Headers(),
+        redirected: false,
+        status: 200,
+        statusText: 'OK',
+        type: 'basic' as ResponseType,
+        url: '',
+        clone: jest.fn(),
+        body: null,
+        bodyUsed: false,
+        arrayBuffer: jest.fn(),
+        blob: jest.fn(),
+        formData: jest.fn(),
+        text: jest.fn(),
+        bytes: jest.fn(),
+      } as Response);
 
       await scopeService.getScopes({
         page: 2,
         size: 20
       });
 
-      const callArgs = (global.fetch as jest.Mock).mock.calls[0];
+      const callArgs = mockFetchWithTokenRefresh.mock.calls[0];
       const endpoint = callArgs[0];
       
       expect(endpoint).toContain('page=2');
@@ -199,10 +294,24 @@ describe('ScopeService', () => {
         id: `scope-${i + 1}`
       }));
 
-      (global.fetch as jest.Mock).mockResolvedValue({
+      mockFetchWithTokenRefresh.mockResolvedValue({
         ok: true,
         json: async () => ({ results: scopes }),
-      });
+        headers: new Headers(),
+        redirected: false,
+        status: 200,
+        statusText: 'OK',
+        type: 'basic' as ResponseType,
+        url: '',
+        clone: jest.fn(),
+        body: null,
+        bodyUsed: false,
+        arrayBuffer: jest.fn(),
+        blob: jest.fn(),
+        formData: jest.fn(),
+        text: jest.fn(),
+        bytes: jest.fn(),
+      } as Response);
 
       const result = await scopeService.getScopes({
         page: 0,
