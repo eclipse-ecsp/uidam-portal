@@ -47,6 +47,7 @@ import {
   LightMode,
   DarkMode,
   LockReset as LockResetIcon,
+  Devices as DevicesIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
@@ -111,6 +112,12 @@ const navigationItems = [
     text: 'Assistant',
     icon: <AdminPanelSettingsIcon />,
     path: '/assistant',
+    feature: true,
+  },
+  {
+    text: 'Active Sessions',
+    icon: <DevicesIcon />,
+    path: '/sessions',
     feature: true,
   },
 ].filter(item => item.feature);
@@ -408,6 +415,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <LockResetIcon fontSize="small" />
               </ListItemIcon>
               Change Password
+            </MenuItem>
+            <MenuItem onClick={() => { handleMenuClose(); navigate('/sessions'); }}>
+              <ListItemIcon>
+                <DevicesIcon fontSize="small" />
+              </ListItemIcon>
+              Manage Active Sessions
             </MenuItem>
             <MenuItem onClick={handleLogout}>
               <ListItemIcon>

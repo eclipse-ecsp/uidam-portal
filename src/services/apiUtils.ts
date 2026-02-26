@@ -211,3 +211,36 @@ export async function fetchWithTokenRefresh(
 
   return response;
 }
+
+/**
+ * Decode JWT token payload
+ * @param token - JWT token string
+ * @returns Decoded token payload or null if invalid
+ */
+export function decodeJwtToken(token: string): Record<string, unknown> | null {
+  try {
+    // NOSONAR - atob() required for JWT token decoding (standard practice)
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload;
+  } catch (error) {
+    console.error('Failed to decode JWT token:', error);
+    return null;
+  }
+}
+
+/**
+ * Extract tenant ID from stored JWT token
+ * @returns Tenant ID from token or null if not available
+ */
+export function getTenantIdFromToken(): string | null {
+  try {
+    const token = localStorage.getItem('uidam_admin_token');
+    if (!token) return null;
+    
+    const payload = decodeJwtToken(token);
+    return (payload?.tenantId as string) || (payload?.tenant_id as string) || null;
+  } catch (error) {
+    console.error('Failed to extract tenant ID from token:', error);
+    return null;
+  }
+}

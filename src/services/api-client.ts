@@ -286,6 +286,8 @@ class ApiClient {
 // Create API client instances
 // Use full backend URL for production deployment
 export const userManagementApi = new ApiClient(API_CONFIG.API_BASE_URL);
-export const authServerApi = new ApiClient(API_CONFIG.AUTH_SERVER_URL);
+// Use empty baseURL for auth server to leverage Vite proxy (/auth, /oauth2)
+// In production, this should be configured via environment variables
+export const authServerApi = new ApiClient('');
 
 export default ApiClient;
