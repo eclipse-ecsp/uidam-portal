@@ -39,6 +39,7 @@ const ScopeManagement = React.lazy(() => import('@features/scope-management/Scop
 const ApprovalWorkflow = React.lazy(() => import('@features/approval-workflow/ApprovalWorkflow'));
 const ClientManagement = React.lazy(() => import('@features/client-management/ClientManagement'));
 const Assistant = React.lazy(() => import('@features/assistant/Assistant'));
+const ActiveSessionsManagement = React.lazy(() => import('@features/session-management/ActiveSessionsManagement'));
 const Login = React.lazy(() => import('@features/auth/Login'));
 const AuthCallback = React.lazy(() => import('@features/auth/AuthCallback'));
 const ChangePassword = React.lazy(() => import('@features/auth/ChangePassword'));
@@ -86,6 +87,7 @@ const AppContent: React.FC = () => {
                       <Route path="/approvals/*" element={<ApprovalWorkflow />} />
                       <Route path="/clients/*" element={<ClientManagement />} />
                       <Route path="/assistant" element={<Assistant />} />
+                      <Route path="/sessions" element={<ActiveSessionsManagement />} />
                       <Route path="*" element={<Navigate to="/dashboard" replace />} />
                     </Routes>
                   </Layout>

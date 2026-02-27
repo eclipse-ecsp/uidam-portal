@@ -44,6 +44,28 @@ export default defineConfig({
           });
         }
       },
+      // Proxy Auth requests (sessions, logout, etc.) to Auth Server (port 9443)
+      // IMPORTANT: Exclude /auth/callback as it's a frontend-only route handled by React Router
+      '/auth': {
+        target: AUTH_SERVER_TARGET,
+        changeOrigin: true,
+        secure: false, // Allow self-signed certificates
+        bypass: (req) => {
+          // Don't proxy /auth/callback - it's a frontend route
+          if (req.url?.startsWith('/auth/callback')) {
+            return req.url; // Return the URL to bypass proxy
+          }
+          return null; // Continue with proxy
+        },
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, _res) => {
+            console.log('Auth Proxy error:', err);
+          });
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            console.log('Proxying Auth request:', req.method, req.url, '->', AUTH_SERVER_TARGET);
+          });
+        }
+      },
       // Proxy API requests (with /api prefix) to UIDAM User Management
       '/api': {
         target: API_PROXY_TARGET,
@@ -85,15 +107,29 @@ export default defineConfig({
             console.log('Proxying User Management API v2 request:', req.method, req.url, '-> http://localhost:9090');
           });
         }
-      }
-      ,
+      },
+      // Proxy session management API requests (self and admin tokens)
+      '/sdp': {
+        target: AUTH_SERVER_TARGET,
+        changeOrigin: true,
+        secure: false,
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, _res) => {
+            console.log('Session Management API Proxy error:', err);
+          });
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            console.log('Proxying Session Management API request:', req.method, req.url, '->', AUTH_SERVER_TARGET);
+          });
+        }
+      },
       // Proxy assistant endpoints from agent (chat/session) -> UIDAM Agent on port 9000
       '/chat': {
         target: ASSISTANT_PROXY_TARGET,
         changeOrigin: true,
         secure: false,
       },
-      '/session': {
+      // Match /session or /session/* but NOT /sessions
+      '^/session(/|$)': {
         target: ASSISTANT_PROXY_TARGET,
         changeOrigin: true,
         secure: false,

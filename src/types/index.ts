@@ -389,3 +389,27 @@ export interface ActivityItem {
   user: string;
   timestamp: string;
 }
+
+// Active Sessions Types
+export interface ActiveSession {
+  sessionId: string;
+  deviceInfo: string;
+  browser?: string;
+  os?: string;
+  ipAddress: string;
+  location?: string;
+  loginTime: string;
+  lastActivity: string;
+  isCurrent: boolean;
+  userAgent?: string;
+}
+
+export interface SessionsResponse {
+  sessions: ActiveSession[];
+  totalCount: number;
+}
+
+export interface TerminateSessionRequest {
+  sessionId: string;
+  reason?: string;
+}
