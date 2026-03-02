@@ -52,6 +52,7 @@ import {
   Email as EmailIcon,
   ManageAccounts as ManageAccountsIcon,
   FilterList as FilterListIcon,
+  Devices as DevicesIcon,
 } from '@mui/icons-material';
 import ManagementLayout from '../../components/shared/ManagementLayout';
 import { StyledTableHead, StyledTableCell, StyledTableRow } from '../../components/shared/StyledTableComponents';
@@ -61,6 +62,7 @@ import EditUserModal from './components/EditUserModal';
 import UserDetailsModal from './components/UserDetailsModal';
 import DeleteUserDialog from './components/DeleteUserDialog';
 import ManageUserAccountsModal from './components/ManageUserAccountsModal';
+import AdminSessionsModal from './components/AdminSessionsModal';
 
 const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -86,6 +88,8 @@ const UserManagement: React.FC = () => {
   const [deleteUserDialogOpen, setDeleteUserDialogOpen] = useState(false);
   const [manageAccountsModalOpen, setManageAccountsModalOpen] = useState(false);
   const [selectedUserForAccounts, setSelectedUserForAccounts] = useState<User | null>(null);
+  const [adminSessionsModalOpen, setAdminSessionsModalOpen] = useState(false);
+  const [adminSessionsUsername, setAdminSessionsUsername] = useState<string | null>(null);
 
   const loadUsers = React.useCallback(async () => {
     setLoading(true);
@@ -334,6 +338,13 @@ const UserManagement: React.FC = () => {
     handleMenuClose();
   };
 
+  // Admin sessions handlers
+  const handleManageAdminSessions = (user: User) => {
+    setAdminSessionsUsername(user.userName);
+    setAdminSessionsModalOpen(true);
+    handleMenuClose();
+  };
+
   const handleUserDeleted = () => {
     setSnackbar({
       open: true,
@@ -541,6 +552,12 @@ const UserManagement: React.FC = () => {
           </ListItemIcon>
           <ListItemText>Manage Accounts & Roles</ListItemText>
         </MenuItem>
+        <MenuItem onClick={() => selectedUser && handleManageAdminSessions(selectedUser)}>
+          <ListItemIcon>
+            <DevicesIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Manage Admin Active Sessions</ListItemText>
+        </MenuItem>
         <MenuItem onClick={() => selectedUser && handleDeleteUser(selectedUser)}>
           <ListItemIcon>
             <DeleteIcon fontSize="small" />
@@ -606,6 +623,15 @@ const UserManagement: React.FC = () => {
         }}
         onError={(message) => {
           setSnackbar({ open: true, message, severity: 'error' });
+        }}
+      />
+
+      <AdminSessionsModal
+        open={adminSessionsModalOpen}
+        username={adminSessionsUsername}
+        onClose={() => {
+          setAdminSessionsModalOpen(false);
+          setAdminSessionsUsername(null);
         }}
       />
     </>
