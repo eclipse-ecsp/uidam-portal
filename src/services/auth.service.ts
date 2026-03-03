@@ -419,38 +419,49 @@ export class AuthService {
   }
 
   /**
-   * Logout user by revoking tokens
+   * Logout user by calling the OAuth2 logout endpoint
+   * @param {string} [postLogoutRedirectUri] - Optional redirect URI after logout
    * @returns {Promise<void>} Completes when logout is finished
    */
-  async logout(): Promise<void> {
-    const token = this.getStoredToken();
+  async logout(postLogoutRedirectUri?: string): Promise<void> {
+    const accessToken = this.getStoredToken();
     
-    if (token) {
+    if (accessToken) {
       try {
-        const revokeParams: Record<string, string> = {
-          token,
+        // Generate state for logout flow
+        const state = Math.random().toString(36).substring(2, 15);
+        
+        // Construct logout URL with access_token as query parameter
+        const logoutUrl = `${API_CONFIG.AUTH_SERVER_URL}/oauth2/logout?access_token=${encodeURIComponent(accessToken)}`;
+        
+        // Prepare form data for logout request
+        const formData = new URLSearchParams();
+        formData.append('id_token_hint', `Bearer ${accessToken}`);
+        formData.append('client_id', OAUTH_CONFIG.CLIENT_ID);
+        formData.append('post_logout_redirect_uri', postLogoutRedirectUri || OAUTH_CONFIG.POST_LOGOUT_REDIRECT_URI);
+        formData.append('state', state);
+        
+        console.log('Initiating OAuth2 logout:', {
+          endpoint: logoutUrl,
           client_id: OAUTH_CONFIG.CLIENT_ID,
-        };
+          post_logout_redirect_uri: postLogoutRedirectUri || OAUTH_CONFIG.POST_LOGOUT_REDIRECT_URI,
+          state: state
+        });
         
-        // Add client_secret if available
-        if (OAUTH_CONFIG.CLIENT_SECRET) {
-          revokeParams.client_secret = OAUTH_CONFIG.CLIENT_SECRET;
-        }
-        
-        // Revoke the access token
-        await fetch('/oauth2/revoke', { // Use relative URL to go through Vite proxy
+        // Call logout endpoint
+        await fetch(logoutUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
           },
-          body: new URLSearchParams(revokeParams),
+          body: formData,
         });
       } catch (error) {
-        console.warn('Token revocation failed:', error);
+        console.warn('Logout request failed:', error);
       }
     }
 
-    // Clean up stored data
+    // Clean up stored data regardless of API call result
     sessionStorage.removeItem('pkce_code_verifier');
     this.clearStoredTokens();
   }

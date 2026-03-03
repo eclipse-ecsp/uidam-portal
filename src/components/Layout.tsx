@@ -43,18 +43,21 @@ import {
   Approval as ApprovalIcon,
   Apps as AppsIcon,
   AccountCircle,
-  Settings,
   Logout,
   LightMode,
   DarkMode,
+  LockReset as LockResetIcon,
+  Devices as DevicesIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '@store/index';
 import { toggleSidebar } from '@store/slices/uiSlice';
-import { logout } from '@store/slices/authSlice';
+import { logout, updateUser } from '@store/slices/authSlice';
 import { useTheme } from '@hooks/useTheme';
 import { FEATURE_FLAGS } from '@config/app.config';
+import { UserService } from '@services/userService';
+import { authService } from '@services/auth.service';
 
 const drawerWidth = 240;
 
@@ -111,6 +114,12 @@ const navigationItems = [
     path: '/assistant',
     feature: true,
   },
+  {
+    text: 'Active Sessions',
+    icon: <DevicesIcon />,
+    path: '/sessions',
+    feature: true,
+  },
 ].filter(item => item.feature);
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
@@ -124,6 +133,47 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
 
+  // Fetch full user profile on mount to get firstName and lastName
+  React.useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const response = await UserService.getSelfUser();
+        if (response.data) {
+          // Map User to AuthUser format
+          const userData = response.data;
+          dispatch(updateUser({
+            id: String(userData.id),
+            userName: userData.userName,
+            email: userData.email || '',
+            firstName: userData.firstName || '',
+            lastName: userData.lastName || '',
+            roles: userData.roles || [],
+            scopes: [], // User service doesn't return scopes, will be populated from token
+            accounts: userData.accounts?.map(a => a.account) || []
+          }));
+        } else if ('id' in response && typeof response.id === 'number') {
+          const userData = response as { id: number; userName: string; email: string; firstName: string; lastName: string; roles?: string[]; accounts?: Array<{ account: string }> };
+          dispatch(updateUser({
+            id: String(userData.id),
+            userName: userData.userName,
+            email: userData.email,
+            firstName: userData.firstName,
+            lastName: userData.lastName,
+            roles: userData.roles || [],
+            scopes: [],
+            accounts: userData.accounts?.map(a => a.account) || []
+          }));
+        }
+      } catch (error) {
+        console.error('Failed to fetch user profile in Layout:', error);
+      }
+    };
+
+    if (user && (!user.firstName || !user.lastName)) {
+      fetchUserProfile();
+    }
+  }, [dispatch, user]);
+
   const handleDrawerToggle = () => {
     dispatch(toggleSidebar());
   };
@@ -136,10 +186,24 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     setAnchorEl(null);
   };
 
-  const handleLogout = () => {
-    dispatch(logout());
-    navigate('/login');
-    handleMenuClose();
+  const handleLogout = async () => {
+    try {
+      // Call auth service logout to hit the OAuth2 logout endpoint
+      await authService.logout();
+      
+      // Clear Redux state
+      dispatch(logout());
+      
+      // Navigate to login
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // Still clear local state even if API call fails
+      dispatch(logout());
+      navigate('/login');
+    } finally {
+      handleMenuClose();
+    }
   };
 
   const drawer = (
@@ -332,20 +396,31 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
           >
             <MenuItem onClick={handleMenuClose}>
-              <Avatar /> {user?.firstName} {user?.lastName}
+              <Avatar /> 
+              {user?.firstName 
+                ? user.lastName 
+                  ? `${user.firstName} ${user.lastName}`
+                  : user.firstName
+                : user?.userName || 'User'}
             </MenuItem>
             <Divider />
-            <MenuItem onClick={handleMenuClose}>
+            <MenuItem onClick={() => { handleMenuClose(); navigate('/profile'); }}>
               <ListItemIcon>
                 <AccountCircle fontSize="small" />
               </ListItemIcon>
               Profile
             </MenuItem>
-            <MenuItem onClick={handleMenuClose}>
+            <MenuItem onClick={() => { handleMenuClose(); navigate('/change-password'); }}>
               <ListItemIcon>
-                <Settings fontSize="small" />
+                <LockResetIcon fontSize="small" />
               </ListItemIcon>
-              Settings
+              Change Password
+            </MenuItem>
+            <MenuItem onClick={() => { handleMenuClose(); navigate('/sessions'); }}>
+              <ListItemIcon>
+                <DevicesIcon fontSize="small" />
+              </ListItemIcon>
+              Manage Active Sessions
             </MenuItem>
             <MenuItem onClick={handleLogout}>
               <ListItemIcon>

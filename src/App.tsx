@@ -32,14 +32,17 @@ import ProtectedRoute from '@components/ProtectedRoute';
 // Feature components (lazy loaded)
 const Dashboard = React.lazy(() => import('@features/dashboard/Dashboard'));
 const UserManagement = React.lazy(() => import('@features/user-management/UserManagement'));
+const Profile = React.lazy(() => import('@features/user-management/Profile'));
 const AccountManagement = React.lazy(() => import('@features/account-management/AccountManagement'));
 const RoleManagement = React.lazy(() => import('@features/role-management/RoleManagement'));
 const ScopeManagement = React.lazy(() => import('@features/scope-management/ScopeManagement'));
 const ApprovalWorkflow = React.lazy(() => import('@features/approval-workflow/ApprovalWorkflow'));
 const ClientManagement = React.lazy(() => import('@features/client-management/ClientManagement'));
 const Assistant = React.lazy(() => import('@features/assistant/Assistant'));
+const ActiveSessionsManagement = React.lazy(() => import('@features/session-management/ActiveSessionsManagement'));
 const Login = React.lazy(() => import('@features/auth/Login'));
 const AuthCallback = React.lazy(() => import('@features/auth/AuthCallback'));
+const ChangePassword = React.lazy(() => import('@features/auth/ChangePassword'));
 
 // Create a query client
 const queryClient = new QueryClient({
@@ -75,6 +78,8 @@ const AppContent: React.FC = () => {
                     <Routes>
                       <Route path="/" element={<Navigate to="/dashboard" replace />} />
                       <Route path="/dashboard" element={<Dashboard />} />
+                      <Route path="/profile" element={<Profile />} />
+                      <Route path="/change-password" element={<ChangePassword />} />
                       <Route path="/users/*" element={<UserManagement />} />
                       <Route path="/accounts/*" element={<AccountManagement />} />
                       <Route path="/roles/*" element={<RoleManagement />} />
@@ -82,6 +87,7 @@ const AppContent: React.FC = () => {
                       <Route path="/approvals/*" element={<ApprovalWorkflow />} />
                       <Route path="/clients/*" element={<ClientManagement />} />
                       <Route path="/assistant" element={<Assistant />} />
+                      <Route path="/sessions" element={<ActiveSessionsManagement />} />
                       <Route path="*" element={<Navigate to="/dashboard" replace />} />
                     </Routes>
                   </Layout>

@@ -25,15 +25,46 @@ import {
   UsersFilterV1,
   UsersFilterV2,
   UserStatusChangeRequest,
-  UserMetaDataRequest,
-  AccountRoleMappingOperation
+  UserMetaDataRequest
 } from './userService';
+import { JsonPatchOperation } from '../utils/jsonPatchUtils';
 import { API_CONFIG } from '@/config/app.config';
+
+// Mock the tokenManager module
+jest.mock('@/utils/tokenManager', () => ({
+  handleTokenRefresh: jest.fn().mockResolvedValue('mock-refreshed-token'),
+  shouldRefreshToken: jest.fn().mockReturnValue(false),
+  getValidToken: jest.fn().mockResolvedValue('mock-valid-token'),
+}));
 
 // Mock fetch globally
 global.fetch = jest.fn();
 
+// Mock localStorage
+const mockLocalStorage = (() => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: (key: string) => store[key] || null,
+    setItem: (key: string, value: string) => { store[key] = value; },
+    removeItem: (key: string) => { delete store[key]; },
+    clear: () => { store = {}; },
+  };
+})();
+
+Object.defineProperty(window, 'localStorage', { value: mockLocalStorage });
+
 describe('UserService', () => {
+  beforeEach(() => {
+    // Setup mock token in localStorage
+    mockLocalStorage.setItem('uidam_admin_token', 'mock-token');
+    mockLocalStorage.setItem('uidam_token_expires_at', String(Date.now() + 3600000)); // 1 hour from now
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+    mockLocalStorage.clear();
+  });
+
   const mockUser: User = {
     id: 1,
     userName: 'testuser',
@@ -178,7 +209,7 @@ describe('UserService', () => {
     describe('updateUserV1', () => {
       it('should update user with patches', async () => {
         const patches = [
-          { op: 'replace', path: '/firstName', value: 'Updated' }
+          { op: 'replace', path: '/firstName', value: 'Updated' } as const
         ];
 
         const mockResponse = { code: 'SUCCESS', data: { ...mockUser, firstName: 'Updated' } };
@@ -199,6 +230,7 @@ describe('UserService', () => {
       });
 
       it('should handle update error', async () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const patches: any[] = [];
         const mockError = {
           code: 'INVALID_PATCH',
@@ -406,7 +438,7 @@ describe('UserService', () => {
     describe('updateUserV2', () => {
       it('should update user via V2 API', async () => {
         const patches = [
-          { op: 'replace', path: '/status', value: 'BLOCKED' }
+          { op: 'replace', path: '/status', value: 'BLOCKED' } as const
         ];
 
         const mockResponse = { code: 'SUCCESS', data: { ...mockUser, status: 'BLOCKED' } };
@@ -571,7 +603,7 @@ describe('UserService', () => {
 
     describe('updateExternalUser', () => {
       it('should update external user', async () => {
-        const patches = [{ op: 'replace', path: '/email', value: 'new@example.com' }];
+        const patches = [{ op: 'replace', path: '/email', value: 'new@example.com' } as const];
 
         const mockResponse = { code: 'SUCCESS', data: { ...mockUser, email: 'new@example.com' } };
         (global.fetch as jest.Mock).mockResolvedValue({
@@ -737,7 +769,7 @@ describe('UserService', () => {
 
     describe('updateSelfUser', () => {
       it('should update current user', async () => {
-        const patches = [{ op: 'replace', path: '/locale', value: 'fr-FR' }];
+        const patches = [{ op: 'replace', path: '/locale', value: 'fr-FR' } as const];
 
         const mockResponse = { code: 'SUCCESS', data: { ...mockUser, locale: 'fr-FR' } };
         (global.fetch as jest.Mock).mockResolvedValue({
@@ -760,7 +792,7 @@ describe('UserService', () => {
         await UserService.deleteSelfUser();
 
         expect(global.fetch).toHaveBeenCalledWith(
-          expect.stringContaining('/v1/users/self'),
+          expect.stringContaining('/v2/users/self'),
           expect.objectContaining({
             method: 'DELETE'
           })
@@ -1216,8 +1248,8 @@ describe('UserService', () => {
           json: async () => mockResponse
         });
 
-        const patches: AccountRoleMappingOperation[] = [
-          { op: 'REPLACE', path: '/lastName', value: undefined }
+        const patches: JsonPatchOperation[] = [
+          { op: 'replace', path: '/lastName', value: undefined }
         ];
 
         await UserService.updateUserV1(1, patches);
@@ -1249,6 +1281,266 @@ describe('UserService', () => {
         expect(global.fetch).toHaveBeenCalledWith(
           `${API_CONFIG.API_BASE_URL}/v1/users/-1?isExternalUser=false`,
           expect.anything()
+        );
+      });
+    });
+  });
+
+  // Password Reset Request Tests
+  describe('Password Reset Request', () => {
+    beforeEach(() => {
+      // Clear localStorage and mocks before each test
+      mockLocalStorage.clear();
+      jest.clearAllMocks();
+    });
+
+    describe('requestPasswordReset', () => {
+      it('should extract user_id from JWT token and add to headers', async () => {
+        // Create a mock JWT token with user_id claim
+        const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+        const payload = btoa(JSON.stringify({ user_id: '12345', username: 'testuser', exp: Date.now() + 3600000 }));
+        const mockToken = `${header}.${payload}.signature`;
+        
+        mockLocalStorage.setItem('uidam_admin_token', mockToken);
+
+        (global.fetch as jest.Mock).mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ status: 'success', message: 'Password reset email sent' }),
+        });
+
+        await UserService.requestPasswordReset();
+
+        expect(global.fetch).toHaveBeenCalledWith(
+          expect.stringContaining('/v1/users/self/recovery/resetpassword'),
+          expect.objectContaining({
+            method: 'POST',
+            headers: expect.objectContaining({
+              'user-id': '12345',
+              'Content-Type': 'application/json'
+            })
+          })
+        );
+      });
+
+      it('should call password reset API successfully', async () => {
+        const header = btoa(JSON.stringify({ alg: 'HS256' }));
+        const payload = btoa(JSON.stringify({ user_id: '999', username: 'admin' }));
+        const mockToken = `${header}.${payload}.signature`;
+        mockLocalStorage.setItem('uidam_admin_token', mockToken);
+
+        const mockResponse = {
+          status: 'success',
+          message: 'Password reset email sent successfully'
+        };
+
+        (global.fetch as jest.Mock).mockResolvedValueOnce({
+          ok: true,
+          json: async () => mockResponse,
+        });
+
+        const result = await UserService.requestPasswordReset();
+
+        expect(result).toEqual(mockResponse);
+        expect(global.fetch).toHaveBeenCalledTimes(1);
+      });
+
+      it('should show user-friendly error for SMTP failures (500 with mail server error)', async () => {
+        const header = btoa(JSON.stringify({ alg: 'HS256' }));
+        const payload = btoa(JSON.stringify({ user_id: '123' }));
+        const mockToken = `${header}.${payload}.signature`;
+        mockLocalStorage.setItem('uidam_admin_token', mockToken);
+
+        const mockErrorResponse = {
+          status: 'error',
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Mail server connection failed. Failed messages: org.eclipse.angus.mail.util.MailConnectException: Couldn\'t connect to host, port: smtp.gmail.com, 587'
+        };
+
+        (global.fetch as jest.Mock).mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          json: async () => mockErrorResponse,
+        });
+
+        await expect(UserService.requestPasswordReset()).rejects.toThrow(
+          'Email service is temporarily unavailable'
+        );
+      });
+
+      it('should handle rate limiting (429)', async () => {
+        const header = btoa(JSON.stringify({ alg: 'HS256' }));
+        const payload = btoa(JSON.stringify({ user_id: '123' }));
+        const mockToken = `${header}.${payload}.signature`;
+        mockLocalStorage.setItem('uidam_admin_token', mockToken);
+
+        (global.fetch as jest.Mock).mockResolvedValueOnce({
+          ok: false,
+          status: 429,
+          json: async () => ({ message: 'Too many password reset requests. Please try again later.' }),
+        });
+
+        await expect(UserService.requestPasswordReset()).rejects.toThrow(
+          'Too many password reset requests. Please try again later.'
+        );
+      });
+
+      it('should handle JWT decoding failures', async () => {
+        // Set an invalid JWT token (not base64 encoded properly)
+        mockLocalStorage.setItem('uidam_admin_token', 'invalid.token.here');
+
+        await expect(UserService.requestPasswordReset()).rejects.toThrow(
+          'Failed to extract user ID from authentication token'
+        );
+      });
+
+      it('should handle missing user_id claim in token', async () => {
+        // Create a token without user_id claim
+        const header = btoa(JSON.stringify({ alg: 'HS256' }));
+        const payload = btoa(JSON.stringify({ username: 'testuser', email: 'test@example.com' }));
+        const mockToken = `${header}.${payload}.signature`;
+        mockLocalStorage.setItem('uidam_admin_token', mockToken);
+
+        await expect(UserService.requestPasswordReset()).rejects.toThrow(
+          'Failed to extract user ID from authentication token'
+        );
+      });
+
+      it('should handle user not found (404)', async () => {
+        const header = btoa(JSON.stringify({ alg: 'HS256' }));
+        const payload = btoa(JSON.stringify({ user_id: '999' }));
+        const mockToken = `${header}.${payload}.signature`;
+        mockLocalStorage.setItem('uidam_admin_token', mockToken);
+
+        (global.fetch as jest.Mock).mockResolvedValueOnce({
+          ok: false,
+          status: 404,
+          json: async () => ({ message: 'User account not found.' }),
+        });
+
+        await expect(UserService.requestPasswordReset()).rejects.toThrow(
+          'User account not found.'
+        );
+      });
+
+      it('should handle invalid request (400)', async () => {
+        const header = btoa(JSON.stringify({ alg: 'HS256' }));
+        const payload = btoa(JSON.stringify({ user_id: '123' }));
+        const mockToken = `${header}.${payload}.signature`;
+        mockLocalStorage.setItem('uidam_admin_token', mockToken);
+
+        (global.fetch as jest.Mock).mockResolvedValueOnce({
+          ok: false,
+          status: 400,
+          json: async () => ({ message: 'Invalid request. Please try again.' }),
+        });
+
+        await expect(UserService.requestPasswordReset()).rejects.toThrow(
+          'Invalid request. Please try again.'
+        );
+      });
+
+      it('should throw error when token is missing from localStorage', async () => {
+        // localStorage is empty (cleared in beforeEach)
+        
+        await expect(UserService.requestPasswordReset()).rejects.toThrow(
+          'Authentication token not found'
+        );
+
+        expect(global.fetch).not.toHaveBeenCalled();
+      });
+
+      it('should handle INTERNAL_SERVER_ERROR code specifically', async () => {
+        const header = btoa(JSON.stringify({ alg: 'HS256' }));
+        const payload = btoa(JSON.stringify({ user_id: '123' }));
+        const mockToken = `${header}.${payload}.signature`;
+        mockLocalStorage.setItem('uidam_admin_token', mockToken);
+
+        (global.fetch as jest.Mock).mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          json: async () => ({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Internal server error'
+          }),
+        });
+
+        await expect(UserService.requestPasswordReset()).rejects.toThrow(
+          'Server error occurred. Please contact your system administrator.'
+        );
+      });
+
+      it('should handle non-JSON error responses', async () => {
+        const header = btoa(JSON.stringify({ alg: 'HS256' }));
+        const payload = btoa(JSON.stringify({ user_id: '123' }));
+        const mockToken = `${header}.${payload}.signature`;
+        mockLocalStorage.setItem('uidam_admin_token', mockToken);
+
+        (global.fetch as jest.Mock).mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          json: async () => { throw new Error('Not JSON'); },
+        });
+
+        await expect(UserService.requestPasswordReset()).rejects.toThrow(
+          'Server error occurred. Please contact your system administrator.'
+        );
+      });
+
+      it('should handle SMTP-specific error message', async () => {
+        const header = btoa(JSON.stringify({ alg: 'HS256' }));
+        const payload = btoa(JSON.stringify({ user_id: '456' }));
+        const mockToken = `${header}.${payload}.signature`;
+        mockLocalStorage.setItem('uidam_admin_token', mockToken);
+
+        (global.fetch as jest.Mock).mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          json: async () => ({
+            message: 'SMTP authentication failed'
+          }),
+        });
+
+        await expect(UserService.requestPasswordReset()).rejects.toThrow(
+          'Email service is temporarily unavailable'
+        );
+      });
+
+      it('should handle token with only 2 parts (invalid format)', async () => {
+        // JWT should have 3 parts: header.payload.signature
+        const invalidToken = 'header.payload';
+        mockLocalStorage.setItem('uidam_admin_token', invalidToken);
+
+        await expect(UserService.requestPasswordReset()).rejects.toThrow(
+          'Failed to extract user ID from authentication token'
+        );
+      });
+
+      it('should handle token with more than 3 parts', async () => {
+        const invalidToken = 'part1.part2.part3.part4';
+        mockLocalStorage.setItem('uidam_admin_token', invalidToken);
+
+        await expect(UserService.requestPasswordReset()).rejects.toThrow(
+          'Failed to extract user ID from authentication token'
+        );
+      });
+
+      it('should handle token with malformed base64 payload', async () => {
+        const mockToken = 'valid-header.invalid-base64!@#$.valid-signature';
+        mockLocalStorage.setItem('uidam_admin_token', mockToken);
+
+        await expect(UserService.requestPasswordReset()).rejects.toThrow(
+          'Failed to extract user ID from authentication token'
+        );
+      });
+
+      it('should handle token with invalid JSON in payload', async () => {
+        const header = btoa(JSON.stringify({ alg: 'HS256' }));
+        const invalidPayload = btoa('{ invalid json }');
+        const mockToken = `${header}.${invalidPayload}.signature`;
+        mockLocalStorage.setItem('uidam_admin_token', mockToken);
+
+        await expect(UserService.requestPasswordReset()).rejects.toThrow(
+          'Failed to extract user ID from authentication token'
         );
       });
     });
