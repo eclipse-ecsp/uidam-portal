@@ -13,5 +13,6 @@
   "REACT_APP_API_RETRY_ATTEMPTS": 3,
   "REACT_APP_API_RETRY_DELAY": 1000,
   "REACT_APP_TOKEN_STORAGE_KEY": "uidam_admin_token",
-  "REACT_APP_REFRESH_TOKEN_STORAGE_KEY": "uidam_admin_refresh_token"
+  "REACT_APP_REFRESH_TOKEN_STORAGE_KEY": "uidam_admin_refresh_token",
+  "REACT_APP_SESSION_API_PREFIX": "/sdp"
 }
