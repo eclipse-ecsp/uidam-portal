@@ -62,16 +62,31 @@ export function getApiHeaders(): HeadersInit {
   // Generate correlation ID for request tracking
   const correlationId = crypto.randomUUID();
   
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
     'X-Correlation-ID': correlationId,
   };
 
   // Add authorization header if token is available
-  // API Gateway will extract user_id, tenant_id, created_by, modified_by, etc. from the JWT token automatically
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+
+    // Decode JWT and extract user_id to send as 'user-id' header.
+    // The backend uses this header to identify the caller — without it the
+    // endpoint returns "User not found for userId: null".
+    try {
+      const parts = token.split('.');
+      if (parts.length === 3) {
+        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+        const userId: string | undefined = payload.user_id ?? payload.userId ?? payload.sub;
+        if (userId) {
+          headers['user-id'] = userId;
+        }
+      }
+    } catch {
+      // Non-fatal: proceed without the header
+    }
   }
 
   return headers;
@@ -210,6 +225,22 @@ export async function fetchWithTokenRefresh(
   }
 
   return response;
+}
+
+/**
+ * Safely parse a JSON string, converting large numeric "id" values to strings.
+ * JavaScript's JSON.parse silently corrupts integers beyond Number.MAX_SAFE_INTEGER
+ * (~16 digits). Backend IDs can be 30+ digits, so they must be treated as strings.
+ * This function pre-processes the raw text to quote any bare numeric id values
+ * (16+ digits) before handing off to JSON.parse.
+ * @param text - Raw JSON response text
+ * @returns Parsed object with large numeric id values preserved as strings
+ */
+export function parseJsonSafe<T>(text: string): T {
+  // Match `"id": <number with 16+ digits>` and wrap the number in quotes.
+  // This covers both object fields and array elements.
+  const safeText = text.replace(/"id"\s*:\s*(\d{16,})/g, '"id": "$1"');
+  return JSON.parse(safeText) as T;
 }
 
 /**
