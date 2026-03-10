@@ -140,7 +140,7 @@ export class AuthService {
    * Handle the OAuth2 callback with authorization code
    * @param {string} code - The authorization code from OAuth2 provider
    * @param {string} state - The state parameter for CSRF protection
-   * @returns {Promise<{ user: AuthUser; tokens: AuthTokens }>} The authenticated user and access tokens
+   * @returns {Promise<object>} The authenticated user and access tokens
    * @throws {Error} If state verification fails or token exchange fails
    */
   async handleAuthCallback(code: string, state: string): Promise<{ user: AuthUser; tokens: AuthTokens }> {

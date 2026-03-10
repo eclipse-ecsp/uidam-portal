@@ -106,7 +106,7 @@ describe('AuthCallback Component', () => {
       });
 
       await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith('/dashboard');
+        expect(mockNavigate).toHaveBeenCalledWith('/uidam/dashboard');
       });
     });
 

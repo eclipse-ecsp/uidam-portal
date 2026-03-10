@@ -131,7 +131,7 @@ export interface UserSearchParams {
 }
 
 export interface UserStatusChangeRequest {
-  ids: number[];
+  ids: string[];
   approved: boolean;
 }
 

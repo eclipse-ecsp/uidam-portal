@@ -182,22 +182,12 @@ const Profile: React.FC = () => {
       console.log('Sending patches:', patches);
       const response = await UserService.updateSelfUser(patches);
 
-      if ('id' in response && typeof response.id === 'number') {
-        // Response is the user object directly
-        setUser(response as unknown as User);
+      const updatedUser = response.data ?? ('userName' in response ? response as unknown as User : null);
+      if (updatedUser) {
+        setUser(updatedUser);
         setSuccessMessage('Profile updated successfully!');
         setEditMode(false);
         setEditedUser({});
-        
-        // Clear success message after 3 seconds
-        setTimeout(() => setSuccessMessage(null), 3000);
-      } else if (response.data) {
-        setUser(response.data);
-        setSuccessMessage('Profile updated successfully!');
-        setEditMode(false);
-        setEditedUser({});
-        
-        // Clear success message after 3 seconds
         setTimeout(() => setSuccessMessage(null), 3000);
       } else {
         setError(response.message || 'Failed to update profile');

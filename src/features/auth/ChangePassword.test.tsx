@@ -99,7 +99,7 @@ describe('ChangePassword Component', () => {
     const cancelButton = screen.getByRole('button', { name: /Cancel/i });
     fireEvent.click(cancelButton);
 
-    expect(mockNavigate).toHaveBeenCalledWith('/profile');
+    expect(mockNavigate).toHaveBeenCalledWith('/uidam/profile');
   });
 
   it('should show loading state during API call', async () => {
@@ -161,7 +161,7 @@ describe('ChangePassword Component', () => {
     const backButton = screen.getByRole('button', { name: /Back to Profile/i });
     fireEvent.click(backButton);
 
-    expect(mockNavigate).toHaveBeenCalledWith('/profile');
+    expect(mockNavigate).toHaveBeenCalledWith('/uidam/profile');
   });
 
   it('should handle rate limit error', async () => {
