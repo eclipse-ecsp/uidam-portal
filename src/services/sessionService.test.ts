@@ -17,146 +17,210 @@
 ********************************************************************************/
 import { SessionsResponse } from '@/types';
 
-// Mock the api-client module before importing SessionService
-const mockAuthServerApi = {
-  get: jest.fn(),
-  post: jest.fn(),
-  put: jest.fn(),
-  patch: jest.fn(),
-  delete: jest.fn(),
-};
-
-jest.mock('./api-client', () => ({
-  authServerApi: mockAuthServerApi,
-  userManagementApi: {
-    get: jest.fn(),
-    post: jest.fn(),
-    put: jest.fn(),
-    patch: jest.fn(),
-    delete: jest.fn(),
-  },
-}));
-
 jest.mock('@config/runtimeConfig', () => ({
   getConfig: jest.fn().mockReturnValue({ REACT_APP_SESSION_API_PREFIX: '/sdp' }),
 }));
 
+jest.mock('@config/app.config', () => ({
+  API_CONFIG: {
+    AUTH_SERVER_URL: 'https://localhost:9443',
+    API_TIMEOUT: 30000,
+  },
+  OAUTH_CONFIG: {
+    TOKEN_STORAGE_KEY: 'uidam_admin_token',
+    REFRESH_TOKEN_STORAGE_KEY: 'uidam_admin_refresh_token',
+  },
+}));
+
 import { SessionService } from './sessionService';
 
+const BASE_URL = 'https://localhost:9443';
 const SELF_TOKENS_PATH = '/sdp/self/tokens';
 const ADMIN_TOKENS_PATH = '/sdp/admin/tokens';
+const MOCK_TOKEN = 'mock-bearer-token';
+
+// Set up global fetch mock at module level (same pattern as userService.test.ts)
+global.fetch = jest.fn();
+
+// Mock localStorage using the same closure pattern as userService.test.ts
+const mockLocalStorage = (() => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: (key: string) => store[key] || null,
+    setItem: (key: string, value: string) => { store[key] = value; },
+    removeItem: (key: string) => { delete store[key]; },
+    clear: () => { store = {}; },
+  };
+})();
+Object.defineProperty(window, 'localStorage', { value: mockLocalStorage, configurable: true });
+
+const mockSelfSessionsResponse: SessionsResponse = {
+  sessions: [
+    {
+      sessionId: 'session-1',
+      deviceInfo: 'Chrome on Windows',
+      ipAddress: '192.168.1.1',
+      loginTime: '2026-02-19T10:00:00Z',
+      lastActivity: '2026-02-19T11:00:00Z',
+      isCurrent: true,
+    },
+  ],
+  totalCount: 1,
+};
+
+const mockAdminSessionsResponse: SessionsResponse = {
+  sessions: [
+    {
+      sessionId: 'session-2',
+      deviceInfo: 'Firefox on Linux',
+      ipAddress: '10.0.0.1',
+      loginTime: '2026-02-20T08:00:00Z',
+      lastActivity: '2026-02-20T09:00:00Z',
+      isCurrent: false,
+    },
+  ],
+  totalCount: 1,
+};
 
 describe('SessionService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockLocalStorage.setItem('uidam_admin_token', MOCK_TOKEN);
+  });
+
+  afterEach(() => {
+    mockLocalStorage.clear();
   });
 
   describe('getActiveSessions', () => {
     it('should fetch all active sessions for current user successfully', async () => {
-      const mockResponse: SessionsResponse = {
-        sessions: [
-          {
-            sessionId: 'session-1',
-            deviceInfo: 'Chrome on Windows',
-            ipAddress: '192.168.1.1',
-            loginTime: '2026-02-19T10:00:00Z',
-            lastActivity: '2026-02-19T11:00:00Z',
-            isCurrent: true,
-          },
-        ],
-        totalCount: 1,
-      };
-
-      (mockAuthServerApi.get as jest.Mock).mockResolvedValue(mockResponse);
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => mockSelfSessionsResponse,
+      });
 
       const result = await SessionService.getActiveSessions();
 
-      expect(mockAuthServerApi.get).toHaveBeenCalledWith(
-        `${SELF_TOKENS_PATH}/active`
+      expect(global.fetch).toHaveBeenCalledWith(
+        `${BASE_URL}${SELF_TOKENS_PATH}/active`,
+        expect.objectContaining({
+          method: 'GET',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${MOCK_TOKEN}`,
+          }),
+        })
       );
-      expect(result).toEqual(mockResponse);
+      expect(result).toEqual(mockSelfSessionsResponse);
     });
 
     it('should handle errors when fetching sessions', async () => {
-      const error = new Error('Network error');
-      (mockAuthServerApi.get as jest.Mock).mockRejectedValue(error);
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        status: 500,
+        text: async () => 'Internal Server Error',
+      });
 
-      await expect(SessionService.getActiveSessions()).rejects.toThrow('Network error');
+      await expect(SessionService.getActiveSessions()).rejects.toThrow('Session API error 500');
     });
   });
 
   describe('terminateSessions', () => {
     it('should invalidate specified token IDs for current user', async () => {
-      (mockAuthServerApi.post as jest.Mock).mockResolvedValue(undefined);
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 204,
+      });
 
       await SessionService.terminateSessions(['token-1', 'token-2']);
 
-      expect(mockAuthServerApi.post).toHaveBeenCalledWith(
-        `${SELF_TOKENS_PATH}/invalidate`,
-        { tokenIds: ['token-1', 'token-2'] }
+      expect(global.fetch).toHaveBeenCalledWith(
+        `${BASE_URL}${SELF_TOKENS_PATH}/invalidate`,
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ tokenIds: ['token-1', 'token-2'] }),
+          headers: expect.objectContaining({
+            Authorization: `Bearer ${MOCK_TOKEN}`,
+          }),
+        })
       );
     });
 
     it('should handle errors when terminating sessions', async () => {
-      const error = new Error('Termination failed');
-      (mockAuthServerApi.post as jest.Mock).mockRejectedValue(error);
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        status: 400,
+        text: async () => 'Termination failed',
+      });
 
-      await expect(SessionService.terminateSessions(['token-1'])).rejects.toThrow('Termination failed');
+      await expect(SessionService.terminateSessions(['token-1'])).rejects.toThrow('Session API error 400');
     });
   });
 
   describe('getAdminActiveSessions', () => {
     it('should fetch active sessions for a specific user (admin)', async () => {
-      const mockResponse: SessionsResponse = {
-        sessions: [
-          {
-            sessionId: 'session-2',
-            deviceInfo: 'Firefox on Linux',
-            ipAddress: '10.0.0.1',
-            loginTime: '2026-02-20T08:00:00Z',
-            lastActivity: '2026-02-20T09:00:00Z',
-            isCurrent: false,
-          },
-        ],
-        totalCount: 1,
-      };
-
-      (mockAuthServerApi.post as jest.Mock).mockResolvedValue(mockResponse);
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => mockAdminSessionsResponse,
+      });
 
       const result = await SessionService.getAdminActiveSessions('testuser');
 
-      expect(mockAuthServerApi.post).toHaveBeenCalledWith(
-        `${ADMIN_TOKENS_PATH}/active`,
-        { username: 'testuser' }
+      expect(global.fetch).toHaveBeenCalledWith(
+        `${BASE_URL}${ADMIN_TOKENS_PATH}/active`,
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ username: 'testuser' }),
+          headers: expect.objectContaining({
+            Authorization: `Bearer ${MOCK_TOKEN}`,
+          }),
+        })
       );
-      expect(result).toEqual(mockResponse);
+      expect(result).toEqual(mockAdminSessionsResponse);
     });
 
     it('should handle errors when fetching admin sessions', async () => {
-      const error = new Error('Admin fetch failed');
-      (mockAuthServerApi.post as jest.Mock).mockRejectedValue(error);
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        status: 403,
+        text: async () => 'Admin fetch failed',
+      });
 
-      await expect(SessionService.getAdminActiveSessions('testuser')).rejects.toThrow('Admin fetch failed');
+      await expect(SessionService.getAdminActiveSessions('testuser')).rejects.toThrow('Session API error 403');
     });
   });
 
   describe('terminateAdminSessions', () => {
     it('should invalidate specified token IDs for a given user (admin)', async () => {
-      (mockAuthServerApi.post as jest.Mock).mockResolvedValue(undefined);
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 204,
+      });
 
       await SessionService.terminateAdminSessions('testuser', ['token-3', 'token-4']);
 
-      expect(mockAuthServerApi.post).toHaveBeenCalledWith(
-        `${ADMIN_TOKENS_PATH}/invalidate`,
-        { username: 'testuser', tokenIds: ['token-3', 'token-4'] }
+      expect(global.fetch).toHaveBeenCalledWith(
+        `${BASE_URL}${ADMIN_TOKENS_PATH}/invalidate`,
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ username: 'testuser', tokenIds: ['token-3', 'token-4'] }),
+          headers: expect.objectContaining({
+            Authorization: `Bearer ${MOCK_TOKEN}`,
+          }),
+        })
       );
     });
 
     it('should handle errors when terminating admin sessions', async () => {
-      const error = new Error('Admin termination failed');
-      (mockAuthServerApi.post as jest.Mock).mockRejectedValue(error);
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        status: 403,
+        text: async () => 'Admin termination failed',
+      });
 
-      await expect(SessionService.terminateAdminSessions('testuser', ['token-3'])).rejects.toThrow('Admin termination failed');
+      await expect(SessionService.terminateAdminSessions('testuser', ['token-3'])).rejects.toThrow('Session API error 403');
     });
   });
 });

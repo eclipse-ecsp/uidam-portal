@@ -96,7 +96,7 @@ jest.mock('./components/ManageUserAccountsModal', () => ({
 
 const mockUsers: User[] = [
   {
-    id: 1,
+    id: '1',
     userName: 'testuser1',
     email: 'test1@example.com',
     firstName: 'Test',
@@ -108,7 +108,7 @@ const mockUsers: User[] = [
     country: 'US',
   },
   {
-    id: 2,
+    id: '2',
     userName: 'testuser3',
     email: 'test2@example.com',
     firstName: 'Test',
@@ -120,7 +120,7 @@ const mockUsers: User[] = [
     country: 'UK',
   },
   {
-    id: 3,
+    id: '3',
     userName: 'blockeduser',
     email: 'blocked@example.com',
     firstName: 'Blocked',
@@ -206,10 +206,10 @@ describe('UserManagement', () => {
     it('should return correct status colors', async () => {
       const usersWithVariousStatuses: User[] = [
         { ...mockUsers[0], status: 'ACTIVE' },
-        { ...mockUsers[0], id: 2, status: 'PENDING' },
-        { ...mockUsers[0], id: 3, status: 'BLOCKED' },
-        { ...mockUsers[0], id: 4, status: 'REJECTED' },
-        { ...mockUsers[0], id: 5, status: 'DEACTIVATED' },
+        { ...mockUsers[0], id: '2', status: 'PENDING' },
+        { ...mockUsers[0], id: '3', status: 'BLOCKED' },
+        { ...mockUsers[0], id: '4', status: 'REJECTED' },
+        { ...mockUsers[0], id: '5', status: 'DEACTIVATED' },
       ];
       (UserService.filterUsersV2 as jest.Mock).mockResolvedValue(usersWithVariousStatuses);
       

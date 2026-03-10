@@ -66,7 +66,7 @@ describe('UserService', () => {
   });
 
   const mockUser: User = {
-    id: 1,
+    id: '1',
     userName: 'testuser',
     status: 'ACTIVE',
     firstName: 'Test',
@@ -85,7 +85,7 @@ describe('UserService', () => {
   const mockUsers: User[] = [
     mockUser,
     {
-      id: 2,
+      id: '2',
       userName: 'testuser2',
       status: 'PENDING',
       firstName: 'Another',
@@ -177,10 +177,11 @@ describe('UserService', () => {
       it('should fetch user by id', async () => {
         const mockResponse = { code: 'SUCCESS', data: mockUser };
         (global.fetch as jest.Mock).mockResolvedValue({
-          json: async () => mockResponse
+          json: async () => mockResponse,
+          text: async () => JSON.stringify(mockResponse)
         });
 
-        const result = await UserService.getUserV1(1);
+        const result = await UserService.getUserV1('1');
 
         expect(result.data).toEqual(mockUser);
         expect(global.fetch).toHaveBeenCalledWith(
@@ -197,10 +198,11 @@ describe('UserService', () => {
           message: 'User not found'
         };
         (global.fetch as jest.Mock).mockResolvedValue({
-          json: async () => mockError
+          json: async () => mockError,
+          text: async () => JSON.stringify(mockError)
         });
 
-        const result = await UserService.getUserV1(999);
+        const result = await UserService.getUserV1('999');
 
         expect(result.code).toBe('NOT_FOUND');
       });
@@ -217,7 +219,7 @@ describe('UserService', () => {
           json: async () => mockResponse
         });
 
-        const result = await UserService.updateUserV1(1, patches);
+        const result = await UserService.updateUserV1('1', patches);
 
         expect(result.code).toBe('SUCCESS');
         expect(global.fetch).toHaveBeenCalledWith(
@@ -240,7 +242,7 @@ describe('UserService', () => {
           json: async () => mockError
         });
 
-        const result = await UserService.updateUserV1(1, patches);
+        const result = await UserService.updateUserV1('1', patches);
 
         expect(result.code).toBe('INVALID_PATCH');
       });
@@ -255,7 +257,7 @@ describe('UserService', () => {
           text: async () => ''
         });
 
-        await UserService.deleteUserV1(1);
+        await UserService.deleteUserV1('1');
 
         expect(global.fetch).toHaveBeenCalledWith(
           expect.stringContaining('/v1/users/1'),
@@ -273,7 +275,7 @@ describe('UserService', () => {
           text: async () => ''
         });
 
-        await UserService.deleteUserV1(1, true);
+        await UserService.deleteUserV1('1', true);
 
         expect(global.fetch).toHaveBeenCalledWith(
           expect.stringContaining('external_user=true'),
@@ -422,10 +424,11 @@ describe('UserService', () => {
       it('should fetch user via V2 API', async () => {
         const mockResponse = { code: 'SUCCESS', data: mockUser };
         (global.fetch as jest.Mock).mockResolvedValue({
-          json: async () => mockResponse
+          json: async () => mockResponse,
+          text: async () => JSON.stringify(mockResponse)
         });
 
-        const result = await UserService.getUserV2(1);
+        const result = await UserService.getUserV2('1');
 
         expect(result.data).toEqual(mockUser);
         expect(global.fetch).toHaveBeenCalledWith(
@@ -448,7 +451,7 @@ describe('UserService', () => {
           text: async () => ''
         });
 
-        const result = await UserService.updateUserV2(1, patches);
+        const result = await UserService.updateUserV2('1', patches);
 
         expect(result.code).toBe('SUCCESS');
       });
@@ -464,7 +467,7 @@ describe('UserService', () => {
         (global.fetch as jest.Mock).mockResolvedValue({
           json: async () => mockUsers,
           ok: true,
-          text: async () => ''
+          text: async () => JSON.stringify(mockUsers)
         });
 
         const result = await UserService.filterUsersV2(filter);
@@ -592,7 +595,7 @@ describe('UserService', () => {
           json: async () => mockResponse
         });
 
-        await UserService.getExternalUser(1);
+        await UserService.getExternalUser('1');
 
         expect(global.fetch).toHaveBeenCalledWith(
           `${API_CONFIG.API_BASE_URL}/v1/users/external/1`,
@@ -610,7 +613,7 @@ describe('UserService', () => {
           json: async () => mockResponse
         });
 
-        const result = await UserService.updateExternalUser(1, patches);
+        const result = await UserService.updateExternalUser('1', patches);
 
         expect(result.code).toBe('SUCCESS');
       });
@@ -623,7 +626,7 @@ describe('UserService', () => {
           json: async () => mockResponse
         });
 
-        await UserService.deleteExternalUser(1);
+        await UserService.deleteExternalUser('1');
 
         expect(global.fetch).toHaveBeenCalledWith(
           `${API_CONFIG.API_BASE_URL}/v1/users/external/1`,
@@ -718,7 +721,7 @@ describe('UserService', () => {
           json: async () => mockResponse
         });
 
-        const result = await UserService.associateAccountAndRoles(1, operations);
+        const result = await UserService.associateAccountAndRoles('1', operations);
 
         expect(result.code).toBe('SUCCESS');
         expect(global.fetch).toHaveBeenCalledWith(
@@ -741,7 +744,7 @@ describe('UserService', () => {
           json: async () => mockResponse
         });
 
-        await UserService.associateAccountAndRoles(1, operations);
+        await UserService.associateAccountAndRoles('1', operations);
 
         const callBody = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
         expect(callBody.length).toBe(2);
@@ -905,7 +908,7 @@ describe('UserService', () => {
           json: async () => mockResponse
         });
 
-        const result = await UserService.addUserEvent(1, event);
+        const result = await UserService.addUserEvent('1', event);
 
         expect(result.code).toBe('SUCCESS');
         expect(global.fetch).toHaveBeenCalledWith(
@@ -932,10 +935,11 @@ describe('UserService', () => {
 
       const mockResponse = { code: 'SUCCESS', data: userWithAccounts };
       (global.fetch as jest.Mock).mockResolvedValue({
-        json: async () => mockResponse
+        json: async () => mockResponse,
+        text: async () => JSON.stringify(mockResponse)
       });
 
-      const result = await UserService.getUserV1(1);
+      const result = await UserService.getUserV1('1');
 
       expect(result.data?.accounts).toHaveLength(2);
       expect(result.data?.accounts?.[0].roles).toContain('ADMIN');
@@ -948,10 +952,11 @@ describe('UserService', () => {
         const userWithStatus: User = { ...mockUser, status };
         const mockResponse = { code: 'SUCCESS', data: userWithStatus };
         (global.fetch as jest.Mock).mockResolvedValue({
-          json: async () => mockResponse
+          json: async () => mockResponse,
+          text: async () => JSON.stringify(mockResponse)
         });
 
-        const result = await UserService.getUserV1(1);
+        const result = await UserService.getUserV1('1');
 
         expect(result.data?.status).toBe(status);
       }
@@ -964,10 +969,11 @@ describe('UserService', () => {
         (global.fetch as jest.Mock).mockResolvedValue({
           ok: false,
           status: 401,
-          json: async () => ({ code: 'UNAUTHORIZED', message: 'Authentication required' })
+          json: async () => ({ code: 'UNAUTHORIZED', message: 'Authentication required' }),
+          text: async () => JSON.stringify({ code: 'UNAUTHORIZED', message: 'Authentication required' })
         });
 
-        const result = await UserService.getUserV1(1);
+        const result = await UserService.getUserV1('1');
         expect(result.code).toBe('UNAUTHORIZED');
       });
 
@@ -975,10 +981,11 @@ describe('UserService', () => {
         (global.fetch as jest.Mock).mockResolvedValue({
           ok: false,
           status: 403,
-          json: async () => ({ code: 'FORBIDDEN', message: 'Access denied' })
+          json: async () => ({ code: 'FORBIDDEN', message: 'Access denied' }),
+          text: async () => JSON.stringify({ code: 'FORBIDDEN', message: 'Access denied' })
         });
 
-        const result = await UserService.getUserV1(1);
+        const result = await UserService.getUserV1('1');
         expect(result.code).toBe('FORBIDDEN');
       });
 
@@ -1032,15 +1039,15 @@ describe('UserService', () => {
       it('should handle network error in fetch', async () => {
         (global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
 
-        await expect(UserService.getUserV1(1)).rejects.toThrow('Network error');
+        await expect(UserService.getUserV1('1')).rejects.toThrow('Network error');
       });
 
       it('should handle JSON parse error', async () => {
         (global.fetch as jest.Mock).mockResolvedValue({
-          json: async () => { throw new Error('Invalid JSON'); }
+          text: async () => { throw new Error('Invalid JSON'); }
         });
 
-        await expect(UserService.getUserV1(1)).rejects.toThrow('Invalid JSON');
+        await expect(UserService.getUserV1('1')).rejects.toThrow('Invalid JSON');
       });
 
       it('should handle non-Error exception', async () => {
@@ -1065,10 +1072,11 @@ describe('UserService', () => {
     describe('Response Format Variations', () => {
       it('should handle response without data field', async () => {
         (global.fetch as jest.Mock).mockResolvedValue({
-          json: async () => ({ code: 'SUCCESS', message: 'Operation completed' })
+          json: async () => ({ code: 'SUCCESS', message: 'Operation completed' }),
+          text: async () => JSON.stringify({ code: 'SUCCESS', message: 'Operation completed' })
         });
 
-        const result = await UserService.getUserV1(1);
+        const result = await UserService.getUserV1('1');
         expect(result.code).toBe('SUCCESS');
         expect(result.data).toBeUndefined();
       });
@@ -1084,19 +1092,21 @@ describe('UserService', () => {
 
       it('should handle null response data', async () => {
         (global.fetch as jest.Mock).mockResolvedValue({
-          json: async () => ({ code: 'SUCCESS', data: null })
+          json: async () => ({ code: 'SUCCESS', data: null }),
+          text: async () => JSON.stringify({ code: 'SUCCESS', data: null })
         });
 
-        const result = await UserService.getUserV1(999);
+        const result = await UserService.getUserV1('999');
         expect(result.data).toBeNull();
       });
 
       it('should handle response with only httpStatus', async () => {
         (global.fetch as jest.Mock).mockResolvedValue({
-          json: async () => ({ httpStatus: '200 OK' })
+          json: async () => ({ httpStatus: '200 OK' }),
+          text: async () => JSON.stringify({ httpStatus: '200 OK' })
         });
 
-        const result = await UserService.getUserV1(1);
+        const result = await UserService.getUserV1('1');
         expect(result.httpStatus).toBe('200 OK');
       });
     });
@@ -1232,7 +1242,7 @@ describe('UserService', () => {
           json: async () => mockResponse
         });
 
-        await UserService.updateUserV1(1, []);
+        await UserService.updateUserV1('1', []);
         expect(global.fetch).toHaveBeenCalledWith(
           expect.any(String),
           expect.objectContaining({
@@ -1252,7 +1262,7 @@ describe('UserService', () => {
           { op: 'replace', path: '/lastName', value: undefined }
         ];
 
-        await UserService.updateUserV1(1, patches);
+        await UserService.updateUserV1('1', patches);
         expect(global.fetch).toHaveBeenCalled();
       });
     });
@@ -1264,7 +1274,7 @@ describe('UserService', () => {
           json: async () => mockResponse
         });
 
-        await UserService.deleteUserV1(0);
+        await UserService.deleteUserV1('0');
         expect(global.fetch).toHaveBeenCalledWith(
           `${API_CONFIG.API_BASE_URL}/v1/users/0?isExternalUser=false`,
           expect.anything()
@@ -1277,7 +1287,7 @@ describe('UserService', () => {
           json: async () => mockResponse
         });
 
-        await UserService.deleteUserV1(-1);
+        await UserService.deleteUserV1('-1');
         expect(global.fetch).toHaveBeenCalledWith(
           `${API_CONFIG.API_BASE_URL}/v1/users/-1?isExternalUser=false`,
           expect.anything()

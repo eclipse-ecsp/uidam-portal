@@ -32,7 +32,7 @@ describe('DeleteUserDialog', () => {
   const mockOnUserDeleted = jest.fn();
 
   const mockUser: User = {
-    id: 123,
+    id: '123',
     userName: 'testuser',
     firstName: 'Test',
     lastName: 'User',
