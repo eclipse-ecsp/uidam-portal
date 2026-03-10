@@ -642,7 +642,7 @@ describe('UserService', () => {
     describe('changeUserStatus', () => {
       it('should approve user status change', async () => {
         const request: UserStatusChangeRequest = {
-          ids: [1, 2],
+          ids: ['1', '2'],
           approved: true
         };
 
@@ -665,7 +665,7 @@ describe('UserService', () => {
 
       it('should reject user status change', async () => {
         const request: UserStatusChangeRequest = {
-          ids: [3],
+          ids: ['3'],
           approved: false
         };
 
