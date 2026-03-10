@@ -556,7 +556,7 @@ const UserManagement: React.FC = () => {
           <ListItemIcon>
             <DevicesIcon fontSize="small" />
           </ListItemIcon>
-          <ListItemText>Manage Admin Active Sessions</ListItemText>
+          <ListItemText>Manage Active Sessions</ListItemText>
         </MenuItem>
         <MenuItem onClick={() => selectedUser && handleDeleteUser(selectedUser)}>
           <ListItemIcon>

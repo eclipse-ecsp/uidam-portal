@@ -124,7 +124,7 @@ export const ChangePassword: React.FC = () => {
                     variant="outlined"
                     size="large"
                     fullWidth
-                    onClick={() => navigate('/profile')}
+                    onClick={() => navigate('/uidam/profile')}
                     disabled={loading}
                   >
                     Cancel
@@ -135,7 +135,7 @@ export const ChangePassword: React.FC = () => {
                   variant="contained"
                   size="large"
                   fullWidth
-                  onClick={() => navigate('/profile')}
+                  onClick={() => navigate('/uidam/profile')}
                 >
                   Back to Profile
                 </Button>

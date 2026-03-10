@@ -69,55 +69,55 @@ const navigationItems = [
   {
     text: 'Dashboard',
     icon: <DashboardIcon />,
-    path: '/dashboard',
+    path: '/uidam/dashboard',
     feature: true, // Always available
   },
   {
     text: 'User Management',
     icon: <PeopleIcon />,
-    path: '/users',
+    path: '/uidam/users',
     feature: FEATURE_FLAGS.USER_MANAGEMENT,
   },
   {
     text: 'Account Management',
     icon: <BusinessIcon />,
-    path: '/accounts',
+    path: '/uidam/accounts',
     feature: FEATURE_FLAGS.ACCOUNT_MANAGEMENT,
   },
   {
     text: 'Role Management',
     icon: <SecurityIcon />,
-    path: '/roles',
+    path: '/uidam/roles',
     feature: FEATURE_FLAGS.ROLE_MANAGEMENT,
   },
   {
     text: 'Scope Management',
     icon: <AdminPanelSettingsIcon />,
-    path: '/scopes',
+    path: '/uidam/scopes',
     feature: FEATURE_FLAGS.SCOPE_MANAGEMENT,
   },
   {
     text: 'Approval Workflow',
     icon: <ApprovalIcon />,
-    path: '/approvals',
+    path: '/uidam/approvals',
     feature: FEATURE_FLAGS.APPROVAL_WORKFLOW,
   },
   {
     text: 'Client Management',
     icon: <AppsIcon />,
-    path: '/clients',
+    path: '/uidam/clients',
     feature: FEATURE_FLAGS.CLIENT_MANAGEMENT,
   },
   {
     text: 'Assistant',
     icon: <AdminPanelSettingsIcon />,
-    path: '/assistant',
+    path: '/uidam/assistant',
     feature: true,
   },
   {
     text: 'Active Sessions',
     icon: <DevicesIcon />,
-    path: '/sessions',
+    path: '/uidam/sessions',
     feature: true,
   },
 ].filter(item => item.feature);
@@ -132,6 +132,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user } = useSelector((state: RootState) => state.auth);
   
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+
+  // Close the profile dropdown menu whenever the route changes
+  React.useEffect(() => {
+    setAnchorEl(null);
+  }, [location.pathname]);
 
   // Fetch full user profile on mount to get firstName and lastName
   React.useEffect(() => {
@@ -358,12 +363,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </Avatar>
           </IconButton>
           
+          {anchorEl && (
           <Menu
             id="account-menu"
             anchorEl={anchorEl}
-            open={Boolean(anchorEl)}
+            open={true}
             onClose={handleMenuClose}
-            onClick={handleMenuClose}
+            keepMounted={false}
+            disableScrollLock
             slotProps={{
               paper: {
                 elevation: 0,
@@ -404,19 +411,19 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 : user?.userName || 'User'}
             </MenuItem>
             <Divider />
-            <MenuItem onClick={() => { handleMenuClose(); navigate('/profile'); }}>
+            <MenuItem onClick={() => { setAnchorEl(null); navigate('/uidam/profile'); }}>
               <ListItemIcon>
                 <AccountCircle fontSize="small" />
               </ListItemIcon>
               Profile
             </MenuItem>
-            <MenuItem onClick={() => { handleMenuClose(); navigate('/change-password'); }}>
+            <MenuItem onClick={() => { setAnchorEl(null); navigate('/uidam/change-password'); }}>
               <ListItemIcon>
                 <LockResetIcon fontSize="small" />
               </ListItemIcon>
               Change Password
             </MenuItem>
-            <MenuItem onClick={() => { handleMenuClose(); navigate('/sessions'); }}>
+            <MenuItem onClick={() => { setAnchorEl(null); navigate('/uidam/sessions'); }}>
               <ListItemIcon>
                 <DevicesIcon fontSize="small" />
               </ListItemIcon>
@@ -429,6 +436,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               Logout
             </MenuItem>
           </Menu>
+          )}
         </Toolbar>
       </AppBar>
       

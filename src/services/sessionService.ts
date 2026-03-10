@@ -15,25 +15,47 @@
 *
 * <p>SPDX-License-Identifier: Apache-2.0
 ********************************************************************************/
-import { authServerApi } from './api-client';
 import { SessionsResponse } from '@/types';
 import { getConfig } from '@config/runtimeConfig';
+import { API_CONFIG, OAUTH_CONFIG } from '@config/app.config';
 
 /**
- * Service for managing user active sessions
- * Handles fetching, terminating, and monitoring user login sessions
+ * Service for managing user active sessions.
  *
- * The API prefix (e.g. "/sdp") is read from config.json (REACT_APP_SESSION_API_PREFIX).
- * Endpoints:
- * - GET  {prefix}/self/tokens/active        – Get active sessions for current user
- * - POST {prefix}/self/tokens/invalidate    – Invalidate current user's sessions
- * - POST {prefix}/admin/tokens/active       – Get active sessions for specific user (admin)
- * - POST {prefix}/admin/tokens/invalidate   – Invalidate sessions for specific user (admin)
+ * Calls the auth server directly using API_CONFIG.AUTH_SERVER_URL (same as
+ * the token API in auth.service.ts). Only Authorization + Content-Type headers
+ * are sent — no user-id / X-Correlation-ID that the auth server rejects.
+ *
+ * Using the direct URL (not proxy) avoids TENANT_RESOLUTION_FAILED: the auth
+ * server resolves tenant from the Host header, which the Vite/nginx proxy
+ * incorrectly replaces with its own host.
+ *
+ * Endpoints (per backend curl spec):
+ * - GET  {authServerUrl}{prefix}/self/tokens/active
+ * - POST {authServerUrl}{prefix}/self/tokens/invalidate
+ * - POST {authServerUrl}{prefix}/admin/tokens/active
+ * - POST {authServerUrl}/admin/tokens/invalidate   ← no {prefix}
  */
 export class SessionService {
   /**
-   * Returns the API prefix from runtime config (e.g. "/sdp").
-   * Falls back to "/sdp" if not configured.
+   * Returns the stored access token from localStorage (same key as ApiClient).
+   * @returns {string | null} The stored access token or null
+   */
+  private static getToken(): string | null {
+    // NOSONAR - localStorage required for OAuth2 token storage (industry standard)
+    return localStorage.getItem(OAUTH_CONFIG.TOKEN_STORAGE_KEY);
+  }
+
+  /**
+   * Returns the auth server base URL from runtime config.
+   * @returns {string} Auth server base URL
+   */
+  private static getBaseUrl(): string {
+    return API_CONFIG.AUTH_SERVER_URL ?? '';
+  }
+
+  /**
+   * Returns the session API prefix from runtime config (e.g. "/sdp").
    * @returns {string} The session API prefix
    */
   private static getPrefix(): string {
@@ -41,68 +63,77 @@ export class SessionService {
   }
 
   /**
-   * Get all active sessions for the current user
-   * @returns {Promise<SessionsResponse>} List of active sessions
+   * Shared fetch helper — calls auth server directly (same as token API).
+   * Only sends Authorization + Content-Type (no user-id / X-Correlation-ID).
+   * @param {string} path - Path appended to auth server base URL
+   * @param {RequestInit} options - Fetch options
+   * @returns {Promise<T>} Parsed JSON response
    */
-  static async getActiveSessions(): Promise<SessionsResponse> {
-    try {
-      const url = `${this.getPrefix()}/self/tokens/active`;
-      console.log('Fetching active sessions:', url);
-      const response = await authServerApi.get<SessionsResponse>(url);
-      return response;
-    } catch (error) {
-      console.error('Error fetching active sessions:', error);
-      throw error;
+  private static async request<T>(path: string, options: RequestInit = {}): Promise<T> {
+    const token = this.getToken();
+    const url = `${this.getBaseUrl()}${path}`;
+    console.log('Session API request:', options.method ?? 'GET', url);
+
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options.headers ?? {}),
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Session API error:', response.status, errorText);
+      throw new Error(`Session API error ${response.status}: ${errorText}`);
     }
+
+    // 204 No Content — return empty object
+    if (response.status === 204) {
+      return {} as T;
+    }
+
+    return response.json() as Promise<T>;
   }
 
   /**
-   * Terminate specific sessions for the current user
+   * Get all active sessions for the current user.
+   * @returns {Promise<SessionsResponse>} List of active sessions
+   */
+  static async getActiveSessions(): Promise<SessionsResponse> {
+    const path = `${this.getPrefix()}/self/tokens/active`;
+    return this.request<SessionsResponse>(path, { method: 'GET' });
+  }
+
+  /**
+   * Terminate specific sessions for the current user.
    * @param {string[]} tokenIds - Array of token IDs to invalidate
    * @returns {Promise<void>} Promise that resolves when sessions are terminated
    */
   static async terminateSessions(tokenIds: string[]): Promise<void> {
-    try {
-      const url = `${this.getPrefix()}/self/tokens/invalidate`;
-      console.log('Terminating sessions:', tokenIds);
-      await authServerApi.post(url, { tokenIds });
-    } catch (error) {
-      console.error('Error terminating sessions:', error);
-      throw error;
-    }
+    const path = `${this.getPrefix()}/self/tokens/invalidate`;
+    await this.request<void>(path, { method: 'POST', body: JSON.stringify({ tokenIds }) });
   }
 
   /**
-   * Get active sessions for a specific user (Admin only)
+   * Get active sessions for a specific user (Admin only).
    * @param {string} username - Username to get sessions for
    * @returns {Promise<SessionsResponse>} List of active sessions for the user
    */
   static async getAdminActiveSessions(username: string): Promise<SessionsResponse> {
-    try {
-      const url = `${this.getPrefix()}/admin/tokens/active`;
-      console.log('Fetching active sessions for user:', username);
-      const response = await authServerApi.post<SessionsResponse>(url, { username });
-      return response;
-    } catch (error) {
-      console.error(`Error fetching sessions for user ${username}:`, error);
-      throw error;
-    }
+    const path = `${this.getPrefix()}/admin/tokens/active`;
+    return this.request<SessionsResponse>(path, { method: 'POST', body: JSON.stringify({ username }) });
   }
 
   /**
-   * Terminate sessions for a specific user (Admin only)
+   * Terminate sessions for a specific user (Admin only).
    * @param {string} username - Username whose sessions to terminate
    * @param {string[]} tokenIds - Array of token IDs to invalidate
    * @returns {Promise<void>} Promise that resolves when sessions are terminated
    */
   static async terminateAdminSessions(username: string, tokenIds: string[]): Promise<void> {
-    try {
-      const url = `${this.getPrefix()}/admin/tokens/invalidate`;
-      console.log('Terminating sessions for user:', username, 'tokens:', tokenIds);
-      await authServerApi.post(url, { username, tokenIds });
-    } catch (error) {
-      console.error(`Error terminating sessions for user ${username}:`, error);
-      throw error;
-    }
+    const path = `${this.getPrefix()}/admin/tokens/invalidate`;
+    await this.request<void>(path, { method: 'POST', body: JSON.stringify({ username, tokenIds }) });
   }
 }

@@ -19,7 +19,7 @@
 // Comprehensive API integration for UIDAM User Management APIs
 
 import { API_CONFIG } from '../config/app.config';
-import { handleApiResponse, getApiHeaders, fetchWithTokenRefresh } from './apiUtils';
+import { handleApiResponse, getApiHeaders, fetchWithTokenRefresh, parseJsonSafe } from './apiUtils';
 import { JsonPatchOperation } from '../utils/jsonPatchUtils';
 
 // API Response interfaces
@@ -32,7 +32,7 @@ export interface ApiResponse<T> {
 
 // User Management Interfaces
 export interface User {
-  id: number;
+  id: string;
   userName: string;
   status: 'PENDING' | 'BLOCKED' | 'REJECTED' | 'ACTIVE' | 'DELETED' | 'DEACTIVATED';
   firstName: string;
@@ -174,11 +174,11 @@ export class UserService {
    * @param {number} id - The unique identifier of the user
    * @returns {Promise<ApiResponse<User>>} The API response containing the user details
    */
-  static async getUserV1(id: number): Promise<ApiResponse<User>> {
+  static async getUserV1(id: string): Promise<ApiResponse<User>> {
     const response = await fetchWithTokenRefresh(`${API_CONFIG.API_BASE_URL}/v1/users/${id}`, {
       method: 'GET',
     });
-    return response.json();
+    return parseJsonSafe<ApiResponse<User>>(await response.text());
   }
 
   /**
@@ -187,7 +187,7 @@ export class UserService {
    * @param {JsonPatchOperation[]} patches - Array of JSON Patch operations to apply
    * @returns {Promise<ApiResponse<User>>} The API response containing the updated user
    */
-  static async updateUserV1(id: number, patches: JsonPatchOperation[]): Promise<ApiResponse<User>> {
+  static async updateUserV1(id: string, patches: JsonPatchOperation[]): Promise<ApiResponse<User>> {
     const response = await fetchWithTokenRefresh(`${API_CONFIG.API_BASE_URL}/v1/users/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(patches),
@@ -201,7 +201,7 @@ export class UserService {
    * @param {boolean} [externalUser] - Optional flag indicating if this is an external user
    * @returns {Promise<ApiResponse<User>>} The API response confirming deletion
    */
-  static async deleteUserV1(id: number, externalUser?: boolean): Promise<ApiResponse<User>> {
+  static async deleteUserV1(id: string, externalUser?: boolean): Promise<ApiResponse<User>> {
     let urlPath = `${API_CONFIG.API_BASE_URL}/v1/users/${id}`;
     if (externalUser !== undefined) {
       urlPath += `?external_user=${externalUser}`;
@@ -261,12 +261,12 @@ export class UserService {
    * @param {number} id - The unique identifier of the user
    * @returns {Promise<ApiResponse<User>>} The API response containing the user with accounts
    */
-  static async getUserV2(id: number): Promise<ApiResponse<User>> {
+  static async getUserV2(id: string): Promise<ApiResponse<User>> {
     const response = await fetchWithTokenRefresh(`${API_CONFIG.API_BASE_URL}/v2/users/${id}`, {
       method: 'GET',
       headers: getApiHeaders(),
     });
-    return response.json();
+    return parseJsonSafe<ApiResponse<User>>(await response.text());
   }
 
   /**
@@ -275,7 +275,7 @@ export class UserService {
    * @param {JsonPatchOperation[]} patches - Array of JSON Patch operations to apply
    * @returns {Promise<ApiResponse<User>>} The API response containing the updated user
    */
-  static async updateUserV2(id: number, patches: JsonPatchOperation[]): Promise<ApiResponse<User>> {
+  static async updateUserV2(id: string, patches: JsonPatchOperation[]): Promise<ApiResponse<User>> {
     const response = await fetchWithTokenRefresh(`${API_CONFIG.API_BASE_URL}/v2/users/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(patches),
@@ -333,8 +333,9 @@ export class UserService {
       throw new Error(errorMessage);
     }
 
-    const data = await response.json();
-    
+    const text = await response.text();
+    const data = parseJsonSafe<User[]>(text);
+
     // Return the data directly as an array
     return data;
   }
@@ -371,7 +372,7 @@ export class UserService {
    * @param {number} id - The unique identifier of the external user
    * @returns {Promise<ApiResponse<User>>} The API response containing the external user details
    */
-  static async getExternalUser(id: number): Promise<ApiResponse<User>> {
+  static async getExternalUser(id: string): Promise<ApiResponse<User>> {
     const response = await fetchWithTokenRefresh(`${API_CONFIG.API_BASE_URL}/v1/users/external/${id}`, {
       method: 'GET',
     });
@@ -384,7 +385,7 @@ export class UserService {
    * @param {JsonPatchOperation[]} patches - Array of JSON Patch operations to apply
    * @returns {Promise<ApiResponse<User>>} The API response containing the updated external user
    */
-  static async updateExternalUser(id: number, patches: JsonPatchOperation[]): Promise<ApiResponse<User>> {
+  static async updateExternalUser(id: string, patches: JsonPatchOperation[]): Promise<ApiResponse<User>> {
     const response = await fetchWithTokenRefresh(`${API_CONFIG.API_BASE_URL}/v1/users/external/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(patches),
@@ -397,7 +398,7 @@ export class UserService {
    * @param {number} id - The unique identifier of the external user to delete
    * @returns {Promise<ApiResponse<User>>} The API response confirming deletion
    */
-  static async deleteExternalUser(id: number): Promise<ApiResponse<User>> {
+  static async deleteExternalUser(id: string): Promise<ApiResponse<User>> {
     const response = await fetch(`${API_CONFIG.API_BASE_URL}/v1/users/external/${id}`, {
       method: 'DELETE',
       headers: getApiHeaders(),
@@ -443,7 +444,7 @@ export class UserService {
    * @returns {Promise<ApiResponse<{ accounts: UserAccount[] }>>} The API response containing updated account associations
    */
   static async associateAccountAndRoles(
-    userId: number, 
+    userId: string, 
     operations: AccountRoleMappingOperation[]
   ): Promise<ApiResponse<{ accounts: UserAccount[] }>> {
     const response = await fetch(`${API_CONFIG.API_BASE_URL}/v1/users/${userId}/accountRoleMapping`, {
@@ -633,7 +634,7 @@ export class UserService {
    * @param {any} event The event data to log
    * @returns {Promise<ApiResponse<string>>} Promise resolving to event creation confirmation
    */
-  static async addUserEvent(userId: number, event: any): Promise<ApiResponse<string>> { // eslint-disable-line @typescript-eslint/no-explicit-any
+  static async addUserEvent(userId: string, event: any): Promise<ApiResponse<string>> { // eslint-disable-line @typescript-eslint/no-explicit-any
     const response = await fetchWithTokenRefresh(`${API_CONFIG.API_BASE_URL}/v1/users/${userId}/events`, {
       method: 'POST',
       body: JSON.stringify(event),
