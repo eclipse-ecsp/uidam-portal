@@ -99,7 +99,9 @@ beforeAll(() => {
        args[0].includes('Not implemented: HTMLFormElement.prototype.submit') ||
        args[0].includes('User filter API error:') ||
        args[0].includes('Password reset request failed:') ||
-       args[0].includes('Failed to decode JWT token:'))
+       args[0].includes('Failed to decode JWT token:') ||
+       args[0].includes('Failed to parse error response:') ||
+       args[0].includes('Failed to fetch user profile in Layout:'))
     ) {
       return;
     }
@@ -111,7 +113,10 @@ beforeAll(() => {
     if (
       typeof args[0] === 'string' &&
       (args[0].includes('Could not extract user_id from token') ||
-       args[0].includes('Could not extract user_id from token for password reset'))
+       args[0].includes('Could not extract user_id from token for password reset') ||
+       args[0].includes('React Router Future Flag Warning:') ||
+       args[0].includes('React Router will begin wrapping') ||
+       args[0].includes('Relative route resolution within Splat'))
     ) {
       return;
     }
