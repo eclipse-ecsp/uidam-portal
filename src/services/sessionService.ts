@@ -22,19 +22,19 @@ import { API_CONFIG, OAUTH_CONFIG } from '@config/app.config';
 /**
  * Service for managing user active sessions.
  *
- * Calls the auth server directly using API_CONFIG.AUTH_SERVER_URL (same as
- * the token API in auth.service.ts). Only Authorization + Content-Type headers
- * are sent — no user-id / X-Correlation-ID that the auth server rejects.
+ * Routes requests through the nginx/Vite proxy (relative URLs) so the browser
+ * stays same-origin and CORS is not triggered. nginx proxies /sdp/ to the
+ * auth server; Vite dev proxy does the same. Only Authorization + Content-Type
+ * headers are sent — no user-id / X-Correlation-ID that the auth server rejects.
  *
- * Using the direct URL (not proxy) avoids TENANT_RESOLUTION_FAILED: the auth
- * server resolves tenant from the Host header, which the Vite/nginx proxy
- * incorrectly replaces with its own host.
+ * The session path prefix (e.g. "/sdp") is read from REACT_APP_SESSION_API_PREFIX
+ * in public/config.json so it can be adjusted per deployment without a rebuild.
  *
  * Endpoints (per backend curl spec):
- * - GET  {authServerUrl}{prefix}/self/tokens/active
- * - POST {authServerUrl}{prefix}/self/tokens/invalidate
- * - POST {authServerUrl}{prefix}/admin/tokens/active
- * - POST {authServerUrl}/admin/tokens/invalidate   ← no {prefix}
+ * - GET  {prefix}/self/tokens/active
+ * - POST {prefix}/self/tokens/invalidate
+ * - POST {prefix}/admin/tokens/active
+ * - POST {prefix}/admin/tokens/invalidate
  */
 export class SessionService {
   /**
@@ -47,14 +47,6 @@ export class SessionService {
   }
 
   /**
-   * Returns the auth server base URL from runtime config.
-   * @returns {string} Auth server base URL
-   */
-  private static getBaseUrl(): string {
-    return API_CONFIG.AUTH_SERVER_URL ?? '';
-  }
-
-  /**
    * Returns the session API prefix from runtime config (e.g. "/sdp").
    * @returns {string} The session API prefix
    */
@@ -63,15 +55,32 @@ export class SessionService {
   }
 
   /**
-   * Shared fetch helper — calls auth server directly (same as token API).
+   * Returns true when running on localhost (Vite dev server).
+   * In dev, we call the auth server directly to avoid Vite proxy stripping
+   * the headers the auth server needs for tenant resolution.
+   * In production, we use a relative URL so nginx proxies the request
+   * (same-origin, no CORS).
+   * @returns {boolean} True if running on localhost
+   */
+  private static isDev(): boolean {
+    const host = window.location.hostname;
+    return host === 'localhost' || host === '127.0.0.1';
+  }
+
+  /**
+   * Shared fetch helper.
+   * - Dev:  calls auth server directly (full URL) — avoids Vite proxy TENANT_RESOLUTION_FAILED
+   * - Prod: uses relative URL — proxied by nginx to the auth server (no CORS)
    * Only sends Authorization + Content-Type (no user-id / X-Correlation-ID).
-   * @param {string} path - Path appended to auth server base URL
+   * @param {string} path - Path relative to auth server (e.g. /sdp/self/tokens/active)
    * @param {RequestInit} options - Fetch options
    * @returns {Promise<T>} Parsed JSON response
    */
   private static async request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const token = this.getToken();
-    const url = `${this.getBaseUrl()}${path}`;
+    const url = this.isDev()
+      ? `${API_CONFIG.AUTH_SERVER_URL}${path}` // direct call in dev
+      : path;                                   // relative URL in prod (nginx proxies)
     console.log('Session API request:', options.method ?? 'GET', url);
 
     const response = await fetch(url, {

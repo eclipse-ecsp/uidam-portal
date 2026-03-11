@@ -331,7 +331,7 @@ export class AuthService {
    */
   private async getUserProfile(accessToken: string): Promise<AuthUser> {
     try {
-      const response = await fetch('/oauth2/introspect', { // Use relative URL to go through Vite proxy
+      const response = await fetch('/oauth2/introspect', { // Use relative URL to go through Vite/nginx proxy
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -393,7 +393,7 @@ export class AuthService {
       formData.append('client_secret', OAUTH_CONFIG.CLIENT_SECRET);
     }
 
-    const response = await fetch('/oauth2/token', { // Use relative URL to go through Vite proxy
+    const response = await fetch('/oauth2/token', { // Use relative URL to go through Vite/nginx proxy
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
