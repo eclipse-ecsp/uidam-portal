@@ -47,6 +47,14 @@ export class SessionService {
   }
 
   /**
+   * Returns true when running under the Vite dev server (no nginx, no proxy).
+   * @returns {boolean} True in dev mode
+   */
+  private static isDev(): boolean {
+    return process.env.NODE_ENV === 'development';
+  }
+
+  /**
    * Returns the session API prefix from runtime config (e.g. "/sdp").
    * @returns {string} The session API prefix
    */
@@ -55,23 +63,10 @@ export class SessionService {
   }
 
   /**
-   * Returns true when running on localhost (Vite dev server).
-   * In dev, we call the auth server directly to avoid Vite proxy stripping
-   * the headers the auth server needs for tenant resolution.
-   * In production, we use a relative URL so nginx proxies the request
-   * (same-origin, no CORS).
-   * @returns {boolean} True if running on localhost
-   */
-  private static isDev(): boolean {
-    const host = window.location.hostname;
-    return host === 'localhost' || host === '127.0.0.1';
-  }
-
-  /**
    * Shared fetch helper.
-   * - Dev:  calls auth server directly (full URL) — avoids Vite proxy TENANT_RESOLUTION_FAILED
-   * - Prod: uses relative URL — proxied by nginx to the auth server (no CORS)
-   * Only sends Authorization + Content-Type (no user-id / X-Correlation-ID).
+   * - Dev:  calls auth server directly (full URL) — avoids Vite dev-server having no /sdp/ proxy
+   * - Prod: uses relative URL — nginx proxies /sdp/ to auth server (same-origin, no CORS)
+   * Only sends Authorization + Content-Type.
    * @param {string} path - Path relative to auth server (e.g. /sdp/self/tokens/active)
    * @param {RequestInit} options - Fetch options
    * @returns {Promise<T>} Parsed JSON response
@@ -79,8 +74,8 @@ export class SessionService {
   private static async request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const token = this.getToken();
     const url = this.isDev()
-      ? `${API_CONFIG.AUTH_SERVER_URL}${path}` // direct call in dev
-      : path;                                   // relative URL in prod (nginx proxies)
+      ? `${API_CONFIG.AUTH_SERVER_URL}${path}` // direct call in dev (no nginx)
+      : path;                                   // relative URL in prod (nginx proxies /sdp/)
     console.log('Session API request:', options.method ?? 'GET', url);
 
     const response = await fetch(url, {
