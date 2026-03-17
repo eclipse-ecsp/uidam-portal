@@ -34,7 +34,7 @@ jest.mock('@config/app.config', () => ({
 
 import { SessionService } from './sessionService';
 
-const BASE_URL = ''; // In test/prod (isDev()=false), service uses relative URLs — nginx proxies /sdp/ to auth server
+const BASE_URL = 'https://localhost:9443'; // Service always uses full auth server URL directly
 const SELF_TOKENS_PATH = '/sdp/self/tokens';
 const ADMIN_TOKENS_PATH = '/sdp/admin/tokens';
 const MOCK_TOKEN = 'mock-bearer-token';

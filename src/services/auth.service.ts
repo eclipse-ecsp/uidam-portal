@@ -94,7 +94,6 @@ export class AuthService {
       const state = this.generateState();
       
       // Construct URL with PKCE parameters if enabled
-      // SESSION_API_PREFIX (e.g. "/sdp") is prepended when auth server has multitenancy enabled.
       const baseUrl = `${API_CONFIG.AUTH_SERVER_URL}${API_CONFIG.SESSION_API_PREFIX}/oauth2/authorize`;
       const scopeValue = OAUTH_CONFIG.SCOPES.join(' ');
       
@@ -332,7 +331,7 @@ export class AuthService {
    */
   private async getUserProfile(accessToken: string): Promise<AuthUser> {
     try {
-      const response = await fetch(`${API_CONFIG.SESSION_API_PREFIX}/oauth2/introspect`, { // Use relative URL to go through Vite/nginx proxy
+      const response = await fetch(`/oauth2/introspect`, { // Use relative URL to go through Vite/nginx proxy
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
