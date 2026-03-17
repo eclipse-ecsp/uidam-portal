@@ -47,14 +47,6 @@ export class SessionService {
   }
 
   /**
-   * Returns true when running under the Vite dev server (no nginx, no proxy).
-   * @returns {boolean} True in dev mode
-   */
-  private static isDev(): boolean {
-    return process.env.NODE_ENV === 'development';
-  }
-
-  /**
    * Returns the session API prefix from runtime config (e.g. "/sdp").
    * @returns {string} The session API prefix
    */
@@ -64,8 +56,8 @@ export class SessionService {
 
   /**
    * Shared fetch helper.
-   * - Dev:  calls auth server directly (full URL) — avoids Vite dev-server having no /sdp/ proxy
-   * - Prod: uses relative URL — nginx proxies /sdp/ to auth server (same-origin, no CORS)
+   * Always calls the auth server directly using REACT_APP_UIDAM_AUTH_SERVER_URL.
+   * CORS is handled by the auth server (Access-Control-Allow-Origin is configured).
    * Only sends Authorization + Content-Type.
    * @param {string} path - Path relative to auth server (e.g. /sdp/self/tokens/active)
    * @param {RequestInit} options - Fetch options
@@ -73,9 +65,7 @@ export class SessionService {
    */
   private static async request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const token = this.getToken();
-    const url = this.isDev()
-      ? `${API_CONFIG.AUTH_SERVER_URL}${path}` // direct call in dev (no nginx)
-      : path;                                   // relative URL in prod (nginx proxies /sdp/)
+    const url = `${API_CONFIG.AUTH_SERVER_URL}${path}`;
     console.log('Session API request:', options.method ?? 'GET', url);
 
     const response = await fetch(url, {
