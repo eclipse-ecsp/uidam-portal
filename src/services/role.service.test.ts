@@ -20,20 +20,18 @@ import { userManagementApi } from './api-client';
 import { handleApiError } from '@/utils/apiErrorHandler';
 import { Role, CreateRoleRequest, UpdateRoleRequest } from '@/types';
 
-// Mock fetch globally for getRoles method
-global.fetch = jest.fn();
+// Mock apiUtils module - all exports are auto-mocked
+jest.mock('./apiUtils');
 
 // Mock userManagementApi for other methods
 jest.mock('./api-client');
 jest.mock('@/utils/apiErrorHandler');
 
-// Mock getApiHeaders
-jest.mock('./apiUtils', () => ({
-  getApiHeaders: jest.fn(() => ({
-    'Content-Type': 'application/json',
-    'Authorization': 'Bearer mock-token'
-  }))
-}));
+import { fetchWithTokenRefresh } from './apiUtils';
+const mockFetchWithTokenRefresh = fetchWithTokenRefresh as jest.MockedFunction<typeof fetchWithTokenRefresh>;
+
+// Mock fetch globally for getRoles method
+global.fetch = jest.fn();
 
 describe('RoleService', () => {
   let roleService: RoleService;
@@ -76,10 +74,10 @@ describe('RoleService', () => {
       const mockResponse = {
         results: mockRoles
       };
-      (global.fetch as jest.Mock).mockResolvedValue({
+      mockFetchWithTokenRefresh.mockResolvedValue({
         ok: true,
         json: async () => mockResponse,
-      });
+      } as any);
 
       const result = await roleService.getRoles({
         page: 0,
@@ -95,26 +93,27 @@ describe('RoleService', () => {
     });
 
     it('should send empty array when no filter name provided', async () => {
-      (global.fetch as jest.Mock).mockResolvedValue({
+      mockFetchWithTokenRefresh.mockResolvedValue({
         ok: true,
         json: async () => ({ results: [] }),
-      });
+      } as unknown as Response);
 
       await roleService.getRoles({
         page: 0,
         size: 10
       });
 
-      const callArgs = (global.fetch as jest.Mock).mock.calls[0];
-      const body = JSON.parse(callArgs[1].body);
+      const callArgs = mockFetchWithTokenRefresh.mock.calls[0];
+      const requestInit = callArgs[1] as RequestInit;
+      const body = JSON.parse(requestInit.body as string);
       expect(body).toEqual({ roles: [] });
     });
 
     it('should send filter name in array when provided', async () => {
-      (global.fetch as jest.Mock).mockResolvedValue({
+      mockFetchWithTokenRefresh.mockResolvedValue({
         ok: true,
         json: async () => ({ results: [mockRole] }),
-      });
+      } as unknown as Response);
 
       await roleService.getRoles({
         page: 0,
@@ -122,17 +121,18 @@ describe('RoleService', () => {
         filter: { name: 'ADMIN' }
       });
 
-      const callArgs = (global.fetch as jest.Mock).mock.calls[0];
-      const body = JSON.parse(callArgs[1].body);
+      const callArgs = mockFetchWithTokenRefresh.mock.calls[0];
+      const requestInit = callArgs[1] as RequestInit;
+      const body = JSON.parse(requestInit.body as string);
       expect(body).toEqual({ roles: ['ADMIN'] });
     });
 
     it('should handle API error with handleApiError', async () => {
-      (global.fetch as jest.Mock).mockResolvedValue({
+      mockFetchWithTokenRefresh.mockResolvedValue({
         ok: false,
         status: 400,
         text: async () => 'API Error',
-      });
+      } as unknown as Response);
 
       await expect(roleService.getRoles({
         page: 0,
@@ -147,10 +147,10 @@ describe('RoleService', () => {
         name: `ROLE_${i + 1}`
       }));
 
-      (global.fetch as jest.Mock).mockResolvedValue({
+      mockFetchWithTokenRefresh.mockResolvedValue({
         ok: true,
         json: async () => ({ results: roles }),
-      });
+      } as unknown as Response);
 
       const result = await roleService.getRoles({
         page: 0,
@@ -162,10 +162,10 @@ describe('RoleService', () => {
     });
 
     it('should handle empty results', async () => {
-      (global.fetch as jest.Mock).mockResolvedValue({
+      mockFetchWithTokenRefresh.mockResolvedValue({
         ok: true,
         json: async () => ({ results: [] }),
-      });
+      } as unknown as Response);
 
       const result = await roleService.getRoles({
         page: 0,
@@ -177,17 +177,17 @@ describe('RoleService', () => {
     });
 
     it('should include pagination in API call', async () => {
-      (global.fetch as jest.Mock).mockResolvedValue({
+      mockFetchWithTokenRefresh.mockResolvedValue({
         ok: true,
         json: async () => ({ results: mockRoles }),
-      });
+      } as unknown as Response);
 
       await roleService.getRoles({
         page: 2,
         size: 20
       });
 
-      const callArgs = (global.fetch as jest.Mock).mock.calls[0];
+      const callArgs = mockFetchWithTokenRefresh.mock.calls[0];
       const endpoint = callArgs[0];
       
       expect(endpoint).toContain('page=2');

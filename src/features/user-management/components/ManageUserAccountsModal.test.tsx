@@ -34,7 +34,7 @@ describe('ManageUserAccountsModal', () => {
   const mockOnClose = jest.fn();
 
   const mockUser: User = {
-    id: 1,
+    id: '1',
     userName: 'testuser',
     email: 'test@example.com',
     firstName: 'Test',

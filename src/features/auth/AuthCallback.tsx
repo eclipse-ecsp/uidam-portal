@@ -61,7 +61,7 @@ const AuthCallback: React.FC = () => {
         
         console.log('OAuth2 callback successful:', authResult.user);
         dispatch(loginSuccess(authResult));
-        navigate('/dashboard');
+        navigate('/uidam/dashboard');
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Authentication failed';
         console.error('AuthCallback error:', err);

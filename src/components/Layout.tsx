@@ -43,18 +43,22 @@ import {
   Approval as ApprovalIcon,
   Apps as AppsIcon,
   AccountCircle,
-  Settings,
   Logout,
   LightMode,
   DarkMode,
+  LockReset as LockResetIcon,
+  Devices as DevicesIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '@store/index';
 import { toggleSidebar } from '@store/slices/uiSlice';
-import { logout } from '@store/slices/authSlice';
+import { logout, updateUser } from '@store/slices/authSlice';
 import { useTheme } from '@hooks/useTheme';
+import { useScopes } from '@hooks/useScopes';
 import { FEATURE_FLAGS } from '@config/app.config';
+import { UserService } from '@services/userService';
+import { authService } from '@services/auth.service';
 
 const drawerWidth = 240;
 
@@ -66,50 +70,65 @@ const navigationItems = [
   {
     text: 'Dashboard',
     icon: <DashboardIcon />,
-    path: '/dashboard',
-    feature: true, // Always available
+    path: '/uidam/dashboard',
+    feature: true,
+    requiredScopes: [] as string[], // Always available
   },
   {
     text: 'User Management',
     icon: <PeopleIcon />,
-    path: '/users',
+    path: '/uidam/users',
     feature: FEATURE_FLAGS.USER_MANAGEMENT,
+    requiredScopes: ['ViewUsers', 'ManageUsers'],
   },
   {
     text: 'Account Management',
     icon: <BusinessIcon />,
-    path: '/accounts',
+    path: '/uidam/accounts',
     feature: FEATURE_FLAGS.ACCOUNT_MANAGEMENT,
+    requiredScopes: ['ViewAccounts', 'ManageAccounts'],
   },
   {
     text: 'Role Management',
     icon: <SecurityIcon />,
-    path: '/roles',
+    path: '/uidam/roles',
     feature: FEATURE_FLAGS.ROLE_MANAGEMENT,
+    requiredScopes: ['ManageUserRolesAndPermissions'],
   },
   {
     text: 'Scope Management',
     icon: <AdminPanelSettingsIcon />,
-    path: '/scopes',
+    path: '/uidam/scopes',
     feature: FEATURE_FLAGS.SCOPE_MANAGEMENT,
+    requiredScopes: [] as string[], // TODO: restrict once backend confirms scope
   },
   {
     text: 'Approval Workflow',
     icon: <ApprovalIcon />,
-    path: '/approvals',
+    path: '/uidam/approvals',
     feature: FEATURE_FLAGS.APPROVAL_WORKFLOW,
+    requiredScopes: [] as string[], // TODO: restrict once backend confirms scope
   },
   {
     text: 'Client Management',
     icon: <AppsIcon />,
-    path: '/clients',
+    path: '/uidam/clients',
     feature: FEATURE_FLAGS.CLIENT_MANAGEMENT,
+    requiredScopes: [] as string[], // TODO: restrict once backend confirms scope
   },
   {
     text: 'Assistant',
     icon: <AdminPanelSettingsIcon />,
-    path: '/assistant',
+    path: '/uidam/assistant',
     feature: true,
+    requiredScopes: [] as string[],
+  },
+  {
+    text: 'Active Sessions',
+    icon: <DevicesIcon />,
+    path: '/uidam/sessions',
+    feature: true,
+    requiredScopes: [] as string[],
   },
 ].filter(item => item.feature);
 
@@ -118,11 +137,66 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const dispatch = useDispatch();
   const { themeMode, toggleThemeMode } = useTheme();
-  
+  const { hasAnyScope, hasScope } = useScopes();
+  const canSelfManage = hasScope('SelfManage');
+
+  // Filter nav items by token scopes: items with no requiredScopes are always shown;
+  // items with requiredScopes are shown only if the token contains at least one.
+  const visibleNavItems = navigationItems.filter(
+    item => item.requiredScopes.length === 0 || hasAnyScope(...item.requiredScopes)
+  );
+
   const { sidebarOpen } = useSelector((state: RootState) => state.ui);
   const { user } = useSelector((state: RootState) => state.auth);
   
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+
+  // Close the profile dropdown menu whenever the route changes
+  React.useEffect(() => {
+    setAnchorEl(null);
+  }, [location.pathname]);
+
+  // Fetch full user profile on mount to get firstName and lastName
+  React.useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const response = await UserService.getSelfUser();
+        if (response.data) {
+          // Map User to AuthUser format
+          const userData = response.data;
+          dispatch(updateUser({
+            id: String(userData.id),
+            userName: userData.userName,
+            email: userData.email || '',
+            firstName: userData.firstName || '',
+            lastName: userData.lastName || '',
+            roles: userData.roles || [],
+            scopes: [], // User service doesn't return scopes, will be populated from token
+            accounts: userData.accounts?.map(a => a.account) || []
+          }));
+        } else if ('id' in response && typeof response.id === 'number') {
+          const userData = response as { id: number; userName: string; email: string; firstName: string; lastName: string; roles?: string[]; accounts?: Array<{ account: string }> };
+          dispatch(updateUser({
+            id: String(userData.id),
+            userName: userData.userName,
+            email: userData.email,
+            firstName: userData.firstName,
+            lastName: userData.lastName,
+            roles: userData.roles || [],
+            scopes: [],
+            accounts: userData.accounts?.map(a => a.account) || []
+          }));
+        }
+      } catch (error) {
+        console.error('Failed to fetch user profile in Layout:', error);
+      }
+    };
+
+    if (user) {
+      fetchUserProfile();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dispatch, user?.id]);
 
   const handleDrawerToggle = () => {
     dispatch(toggleSidebar());
@@ -136,10 +210,24 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     setAnchorEl(null);
   };
 
-  const handleLogout = () => {
-    dispatch(logout());
-    navigate('/login');
-    handleMenuClose();
+  const handleLogout = async () => {
+    try {
+      // Call auth service logout to hit the OAuth2 logout endpoint
+      await authService.logout();
+      
+      // Clear Redux state
+      dispatch(logout());
+      
+      // Navigate to login
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // Still clear local state even if API call fails
+      dispatch(logout());
+      navigate('/login');
+    } finally {
+      handleMenuClose();
+    }
   };
 
   const drawer = (
@@ -164,7 +252,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       </Toolbar>
       <Divider />
       <List>
-        {navigationItems.map((item) => (
+        {visibleNavItems.map((item) => (
           <ListItem key={item.text} disablePadding>
             <ListItemButton
               selected={location.pathname.startsWith(item.path)}
@@ -273,7 +361,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               letterSpacing: '0.5px'
             }}
           >
-            {navigationItems.find(item => location.pathname.startsWith(item.path))?.text ?? 'Dashboard'}
+            {visibleNavItems.find(item => location.pathname.startsWith(item.path))?.text ?? 'Dashboard'}
           </Typography>
           
           <IconButton color="inherit" onClick={toggleThemeMode}>
@@ -290,16 +378,18 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             color="inherit"
           >
             <Avatar sx={{ width: 32, height: 32 }}>
-              {user?.firstName?.[0] ?? user?.userName?.[0] ?? 'U'}
+              {(user?.firstName?.[0] ?? user?.userName?.split('@')[0]?.[0] ?? user?.email?.split('@')[0]?.[0] ?? 'U').toUpperCase()}
             </Avatar>
           </IconButton>
           
+          {anchorEl && (
           <Menu
             id="account-menu"
             anchorEl={anchorEl}
-            open={Boolean(anchorEl)}
+            open={true}
             onClose={handleMenuClose}
-            onClick={handleMenuClose}
+            keepMounted={false}
+            disableScrollLock
             slotProps={{
               paper: {
                 elevation: 0,
@@ -332,20 +422,39 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
           >
             <MenuItem onClick={handleMenuClose}>
-              <Avatar /> {user?.firstName} {user?.lastName}
+              <Avatar /> 
+              {user?.firstName 
+                ? user.lastName 
+                  ? `${user.firstName} ${user.lastName}`
+                  : user.firstName
+                : user?.userName
+                  ? user.userName.split('@')[0]
+                  : user?.email
+                    ? user.email.split('@')[0]
+                    : 'User'}
             </MenuItem>
             <Divider />
-            <MenuItem onClick={handleMenuClose}>
+            {canSelfManage && (
+              <MenuItem onClick={() => { setAnchorEl(null); navigate('/uidam/profile'); }}>
+                <ListItemIcon>
+                  <AccountCircle fontSize="small" />
+                </ListItemIcon>
+                Profile
+              </MenuItem>
+            )}
+            {canSelfManage && (
+              <MenuItem onClick={() => { setAnchorEl(null); navigate('/uidam/change-password'); }}>
+                <ListItemIcon>
+                  <LockResetIcon fontSize="small" />
+                </ListItemIcon>
+                Change Password
+              </MenuItem>
+            )}
+            <MenuItem onClick={() => { setAnchorEl(null); navigate('/uidam/sessions'); }}>
               <ListItemIcon>
-                <AccountCircle fontSize="small" />
+                <DevicesIcon fontSize="small" />
               </ListItemIcon>
-              Profile
-            </MenuItem>
-            <MenuItem onClick={handleMenuClose}>
-              <ListItemIcon>
-                <Settings fontSize="small" />
-              </ListItemIcon>
-              Settings
+              Manage Active Sessions
             </MenuItem>
             <MenuItem onClick={handleLogout}>
               <ListItemIcon>
@@ -354,6 +463,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               Logout
             </MenuItem>
           </Menu>
+          )}
         </Toolbar>
       </AppBar>
       

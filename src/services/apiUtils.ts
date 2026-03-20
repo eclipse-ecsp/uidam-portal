@@ -15,6 +15,8 @@
 *
 * <p>SPDX-License-Identifier: Apache-2.0
 ********************************************************************************/
+import { handleTokenRefresh, shouldRefreshToken } from '../utils/tokenManager';
+
 /**
  * Shared utilities for API services
  * Provides common functionality for handling API requests and responses
@@ -60,16 +62,31 @@ export function getApiHeaders(): HeadersInit {
   // Generate correlation ID for request tracking
   const correlationId = crypto.randomUUID();
   
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
     'X-Correlation-ID': correlationId,
   };
 
   // Add authorization header if token is available
-  // API Gateway will extract user_id, tenant_id, created_by, modified_by, etc. from the JWT token automatically
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+
+    // Decode JWT and extract user_id to send as 'user-id' header.
+    // The backend uses this header to identify the caller — without it the
+    // endpoint returns "User not found for userId: null".
+    try {
+      const parts = token.split('.');
+      if (parts.length === 3) {
+        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+        const userId: string | undefined = payload.user_id ?? payload.userId ?? payload.sub;
+        if (userId) {
+          headers['user-id'] = userId;
+        }
+      }
+    } catch {
+      // Non-fatal: proceed without the header
+    }
   }
 
   return headers;
@@ -150,5 +167,111 @@ export async function makeFetchRequest<T>(
       success: false,
       error: err instanceof Error ? err.message : `Failed to ${context}`
     };
+  }
+}
+
+/**
+ * Fetch wrapper with automatic token refresh
+ * Automatically refreshes expired tokens before making requests
+ * Retries requests with new token if 401 response is received
+ * @param url - The URL to fetch
+ * @param options - Fetch options
+ * @returns Promise with Response object
+ */
+export async function fetchWithTokenRefresh(
+  url: string,
+  options: RequestInit = {}
+): Promise<Response> {
+  // Check if token needs refresh before making the request
+  if (shouldRefreshToken()) {
+    console.log('Token expired, refreshing before request...');
+    const newToken = await handleTokenRefresh();
+    if (!newToken) {
+      throw new Error('Authentication required - token refresh failed');
+    }
+  }
+
+  // Merge headers with authorization
+  const headers = {
+    ...getApiHeaders(),
+    ...options.headers,
+  };
+
+  // Make the initial request
+  let response = await fetch(url, {
+    ...options,
+    headers,
+  });
+
+  // If 401, try refreshing token once and retry
+  if (response.status === 401) {
+    console.log('Received 401, attempting token refresh...');
+    const newToken = await handleTokenRefresh();
+    
+    if (newToken) {
+      // Retry request with new token
+      const retryHeaders = {
+        ...getApiHeaders(),
+        ...options.headers,
+      };
+      
+      response = await fetch(url, {
+        ...options,
+        headers: retryHeaders,
+      });
+    } else {
+      throw new Error('Authentication failed - please log in again');
+    }
+  }
+
+  return response;
+}
+
+/**
+ * Safely parse a JSON string, converting large numeric "id" values to strings.
+ * JavaScript's JSON.parse silently corrupts integers beyond Number.MAX_SAFE_INTEGER
+ * (~16 digits). Backend IDs can be 30+ digits, so they must be treated as strings.
+ * This function pre-processes the raw text to quote any bare numeric id values
+ * (16+ digits) before handing off to JSON.parse.
+ * @param text - Raw JSON response text
+ * @returns Parsed object with large numeric id values preserved as strings
+ */
+export function parseJsonSafe<T>(text: string): T {
+  // Match `"id": <number with 16+ digits>` and wrap the number in quotes.
+  // This covers both object fields and array elements.
+  const safeText = text.replace(/"id"\s*:\s*(\d{16,})/g, '"id": "$1"');
+  return JSON.parse(safeText) as T;
+}
+
+/**
+ * Decode JWT token payload
+ * @param token - JWT token string
+ * @returns Decoded token payload or null if invalid
+ */
+export function decodeJwtToken(token: string): Record<string, unknown> | null {
+  try {
+    // NOSONAR - atob() required for JWT token decoding (standard practice)
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload;
+  } catch (error) {
+    console.error('Failed to decode JWT token:', error);
+    return null;
+  }
+}
+
+/**
+ * Extract tenant ID from stored JWT token
+ * @returns Tenant ID from token or null if not available
+ */
+export function getTenantIdFromToken(): string | null {
+  try {
+    const token = localStorage.getItem('uidam_admin_token');
+    if (!token) return null;
+    
+    const payload = decodeJwtToken(token);
+    return (payload?.tenantId as string) || (payload?.tenant_id as string) || null;
+  } catch (error) {
+    console.error('Failed to extract tenant ID from token:', error);
+    return null;
   }
 }

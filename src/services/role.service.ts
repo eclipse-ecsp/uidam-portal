@@ -26,7 +26,7 @@ import {
 import { API_CONFIG } from '@/config/app.config';
 import { userManagementApi } from './api-client';
 import { createResource, updateResource, deleteResource, getResource, buildQueryParams } from '@/utils/serviceHelpers';
-import { getApiHeaders } from './apiUtils';
+import { fetchWithTokenRefresh } from './apiUtils';
 
 /**
  * Service class for managing role operations
@@ -35,9 +35,9 @@ import { getApiHeaders } from './apiUtils';
 export class RoleService {
   /**
    * Retrieves a paginated list of roles with optional filtering
-   * @param {FilterParams & { filter?: RoleFilterRequest }} params - Pagination parameters and optional role filter
-   * @returns {Promise<PaginatedResponse<Role>>} Paginated response containing roles
-   * @throws {Error} If the API request fails
+   * @param {Object} params Pagination parameters and optional role filter
+   * @returns {Promise<PaginatedResponse<Role>>} Promise resolving to paginated response containing roles
+   * @throws Error if the API request fails
    */
   async getRoles(params: FilterParams & { filter?: RoleFilterRequest }): Promise<PaginatedResponse<Role>> {
     // Build filter request - backend requires roles field even if empty
@@ -57,10 +57,9 @@ export class RoleService {
     console.log('Role Service - Getting roles:', { url: finalUrl, filterRequest, correlationId });
 
     try {
-      const response = await fetch(finalUrl, {
+      const response = await fetchWithTokenRefresh(finalUrl, {
         method: 'POST',
         headers: {
-          ...getApiHeaders(),
           'X-Correlation-ID': correlationId,
         },
         body: JSON.stringify(filterRequest),
@@ -77,14 +76,43 @@ export class RoleService {
       
       console.log('Role Service - Success:', { resultsCount: results.length, correlationId });
       
+      // Get total count for pagination
+      let totalCount = results.length;
+      
+      // If we got a full page of results, there might be more - fetch total count
+      if (results.length === params.size) {
+        try {
+          const totalResponse = await fetchWithTokenRefresh(`${urlPath}?page=0&pageSize=10000`, {
+            method: 'POST',
+            headers: {
+              'X-Correlation-ID': crypto.randomUUID(),
+            },
+            body: JSON.stringify(filterRequest),
+          });
+          
+          if (totalResponse.ok) {
+            const totalData: { results?: Role[] } = await totalResponse.json();
+            totalCount = (totalData.results || []).length;
+            console.log('Role Service - Total count fetched:', totalCount);
+          }
+        } catch (error) {
+          console.warn('Role Service - Failed to get total count, using current results:', error);
+          // If total count fetch fails, estimate based on current page
+          totalCount = params.page * params.size + results.length;
+        }
+      } else {
+        // Current page has fewer results than requested, so we know the total
+        totalCount = params.page * params.size + results.length;
+      }
+      
       return {
         content: results,
-        totalElements: results.length,
-        totalPages: Math.ceil(results.length / params.size),
+        totalElements: totalCount,
+        totalPages: Math.ceil(totalCount / params.size),
         size: params.size,
         number: params.page,
         first: params.page === 0,
-        last: params.page >= Math.ceil(results.length / params.size) - 1,
+        last: params.page >= Math.ceil(totalCount / params.size) - 1,
       };
     } catch (error: unknown) {
       console.error('Role Service - Error details:', { error, correlationId });

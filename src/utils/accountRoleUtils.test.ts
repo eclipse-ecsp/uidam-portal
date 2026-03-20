@@ -47,7 +47,7 @@ describe('accountRoleUtils', () => {
   };
 
   const mockUser: ServiceUser = {
-    id: 1,
+    id: '1',
     firstName: 'John',
     lastName: 'Doe',
     email: 'john@example.com',

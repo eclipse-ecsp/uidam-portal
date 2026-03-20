@@ -51,23 +51,32 @@ import {
   Block as BlockIcon,
   Email as EmailIcon,
   ManageAccounts as ManageAccountsIcon,
+  FilterList as FilterListIcon,
+  Devices as DevicesIcon,
 } from '@mui/icons-material';
 import ManagementLayout from '../../components/shared/ManagementLayout';
 import { StyledTableHead, StyledTableCell, StyledTableRow } from '../../components/shared/StyledTableComponents';
+import { useScopes } from '@hooks/useScopes';
 import { User, UserService, UsersFilterV2, UserSearchParams } from '../../services/userService';
 import CreateUserModal from './components/CreateUserModal';
 import EditUserModal from './components/EditUserModal';
 import UserDetailsModal from './components/UserDetailsModal';
 import DeleteUserDialog from './components/DeleteUserDialog';
 import ManageUserAccountsModal from './components/ManageUserAccountsModal';
+import AdminSessionsModal from './components/AdminSessionsModal';
 
 const UserManagement: React.FC = () => {
+  const { hasScope, hasAnyScope } = useScopes();
+  const canManageUsers = hasScope('ManageUsers');        // POST/PUT/DELETE /users
+  const canViewUsers   = hasAnyScope('ViewUsers', 'ManageUsers'); // GET /users
+
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('');
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalUsers, setTotalUsers] = useState(0);
   const [snackbar, setSnackbar] = useState({ 
     open: false, 
@@ -84,6 +93,8 @@ const UserManagement: React.FC = () => {
   const [deleteUserDialogOpen, setDeleteUserDialogOpen] = useState(false);
   const [manageAccountsModalOpen, setManageAccountsModalOpen] = useState(false);
   const [selectedUserForAccounts, setSelectedUserForAccounts] = useState<User | null>(null);
+  const [adminSessionsModalOpen, setAdminSessionsModalOpen] = useState(false);
+  const [adminSessionsUsername, setAdminSessionsUsername] = useState<string | null>(null);
 
   const loadUsers = React.useCallback(async () => {
     setLoading(true);
@@ -100,6 +111,11 @@ const UserManagement: React.FC = () => {
         const search = searchTerm.trim();
         filter.userNames = [search];
       }
+      
+      // Add status filter if selected
+      if (statusFilter) {
+        filter.status = [statusFilter as 'PENDING' | 'BLOCKED' | 'REJECTED' | 'ACTIVE' | 'DELETED' | 'DEACTIVATED'];
+      }
 
       const searchParams: UserSearchParams = {
         pageNumber: page,
@@ -112,15 +128,58 @@ const UserManagement: React.FC = () => {
 
       try {
         // Call the real API
-        const users = await UserService.filterUsersV2(filter, searchParams);
+        const response = await UserService.filterUsersV2(filter, searchParams);
+        console.log('API Response:', response);
         
-        if (Array.isArray(users)) {
-          setUsers(users);
-          setTotalUsers(users.length);
-        } else {
-          console.warn('Unexpected response format:', users);
-          throw new Error('Invalid response format');
+        // Handle different response formats
+        let usersList: User[] = [];
+        
+        if (Array.isArray(response)) {
+          // Direct array response
+          usersList = response;
+        } else if (response && typeof response === 'object' && 'data' in response) {
+          const dataResponse = response as { data?: unknown };
+          if (Array.isArray(dataResponse.data)) {
+            // Wrapped in data property
+            usersList = dataResponse.data as User[];
+          }
         }
+        // Always set users state with the processed list (empty array if no data)
+        // This ensures consistent state management regardless of API response format
+        setUsers(usersList);
+        
+        // For V1 API without total count, fetch total separately with large pageSize
+        // or use a separate API call. For now, we'll request a large pageSize to get approximate total
+        if (usersList.length === rowsPerPage) {
+          // Likely there are more records, make a call without pagination to get total
+          try {
+            const totalResponse = await UserService.filterUsersV2(filter, {
+              ...searchParams,
+              pageNumber: 0,
+              pageSize: 10000 // Large number to get all records for count
+            });
+            
+            let totalList: User[] = [];
+            if (Array.isArray(totalResponse)) {
+              totalList = totalResponse;
+            } else if (totalResponse && typeof totalResponse === 'object' && 'data' in totalResponse) {
+              const dataResponse = totalResponse as { data?: unknown };
+              if (Array.isArray(dataResponse.data)) {
+                totalList = dataResponse.data as User[];
+              }
+            }
+            
+            setTotalUsers(totalList.length);
+          } catch (error) {
+            console.error('Failed to get total count:', error);
+            setTotalUsers(usersList.length);
+          }
+        } else {
+          // Current page has fewer records than pageSize, so this is likely the last/only page
+          setTotalUsers(page * rowsPerPage + usersList.length);
+        }
+        
+        console.log('Users loaded:', usersList.length);
       } catch (apiError) {
         console.error('API call failed:', apiError);
         setSnackbar({ 
@@ -150,7 +209,7 @@ const UserManagement: React.FC = () => {
         setLoading(false);
       }, remainingTime);
     }
-  }, [page, rowsPerPage, searchTerm]);
+  }, [page, rowsPerPage, searchTerm, statusFilter]);
 
   useEffect(() => {
     loadUsers();
@@ -284,6 +343,13 @@ const UserManagement: React.FC = () => {
     handleMenuClose();
   };
 
+  // Admin sessions handlers
+  const handleManageAdminSessions = (user: User) => {
+    setAdminSessionsUsername(user.userName);
+    setAdminSessionsModalOpen(true);
+    handleMenuClose();
+  };
+
   const handleUserDeleted = () => {
     setSnackbar({
       open: true,
@@ -304,29 +370,59 @@ const UserManagement: React.FC = () => {
       >
         {/* Search and Actions */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <TextField
-            placeholder="Search users by name, username, or email..."
-            variant="outlined"
-            size="small"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
-            }}
-            sx={{ minWidth: 400 }}
-          />
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={handleCreateUser}
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flex: 1 }}>
+            <TextField
+              placeholder="Search users by name, username, or email..."
+              variant="outlined"
+              size="small"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ minWidth: 400 }}
+            />
+            <TextField
+              select
+              placeholder="Filter by status"
+              variant="outlined"
+              size="small"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <FilterListIcon />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ minWidth: 200 }}
+              SelectProps={{
+                displayEmpty: true,
+              }}
             >
-              Create User
-            </Button>
+              <MenuItem value="">All Status</MenuItem>
+              <MenuItem value="ACTIVE">Active</MenuItem>
+              <MenuItem value="PENDING">Pending</MenuItem>
+              <MenuItem value="BLOCKED">Blocked</MenuItem>
+              <MenuItem value="REJECTED">Rejected</MenuItem>
+              <MenuItem value="DEACTIVATED">Deactivated</MenuItem>
+            </TextField>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            {canManageUsers && (
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={handleCreateUser}
+              >
+                Create User
+              </Button>
+            )}
           </Box>
         </Box>
 
@@ -334,24 +430,23 @@ const UserManagement: React.FC = () => {
         <TableContainer component={Paper} sx={{ 
           boxShadow: 2, 
           borderRadius: 2, 
-          overflow: 'auto',
-          maxWidth: '100%'
+          overflow: 'hidden',
+          width: '100%'
         }}>
-          <Table stickyHeader>
+          <Table stickyHeader sx={{ tableLayout: 'fixed', width: '100%' }}>
             <StyledTableHead>
               <TableRow>
-                <StyledTableCell sx={{ width: '15%', minWidth: 120 }}>Username</StyledTableCell>
-                <StyledTableCell sx={{ width: '20%', minWidth: 150 }}>Email</StyledTableCell>
-                <StyledTableCell sx={{ width: '12%', minWidth: 100 }}>Status</StyledTableCell>
-                <StyledTableCell sx={{ width: '33%', minWidth: 180 }}>Accounts</StyledTableCell>
-                <StyledTableCell sx={{ width: '10%', minWidth: 80 }}>Country</StyledTableCell>
-                <StyledTableCell align="center" sx={{ width: '10%', minWidth: 100 }}>Actions</StyledTableCell>
+                <StyledTableCell sx={{ width: '15%' }}>Username</StyledTableCell>
+                <StyledTableCell sx={{ width: '22%' }}>Email</StyledTableCell>
+                <StyledTableCell sx={{ width: '12%' }}>Status</StyledTableCell>
+                <StyledTableCell sx={{ width: '41%' }}>Accounts and Roles</StyledTableCell>
+                <StyledTableCell align="center" sx={{ width: '10%' }}>Actions</StyledTableCell>
               </TableRow>
             </StyledTableHead>
             <TableBody>
               {loading && (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
                     <CircularProgress />
                     <Typography variant="body2" sx={{ mt: 2 }}>Loading users...</Typography>
                   </TableCell>
@@ -359,7 +454,7 @@ const UserManagement: React.FC = () => {
               )}
               {!loading && users.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
                     <Typography variant="body1" color="text.secondary">
                       No users found
                     </Typography>
@@ -378,7 +473,7 @@ const UserManagement: React.FC = () => {
                         {user.userName}
                       </Typography>
                     </TableCell>
-                    <TableCell>{user.email}</TableCell>
+                    <TableCell sx={{ wordBreak: 'break-all' }}>{user.email}</TableCell>
                     <TableCell>
                       <Chip
                         icon={getStatusIcon(user.status)}
@@ -399,8 +494,7 @@ const UserManagement: React.FC = () => {
                         />
                       ))}
                     </TableCell>
-                    <TableCell>{user.country ?? '-'}</TableCell>
-                    <TableCell align="center" sx={{ minWidth: 120, width: 120 }}>
+                    <TableCell align="center">
                       <IconButton
                         aria-label="actions"
                         size="medium"
@@ -429,7 +523,7 @@ const UserManagement: React.FC = () => {
 
         {/* Pagination */}
         <TablePagination
-          rowsPerPageOptions={[10, 25, 50, 100]}
+          rowsPerPageOptions={[5, 10, 25, 50, 100]}
           component="div"
           count={totalUsers}
           rowsPerPage={rowsPerPage}
@@ -445,30 +539,51 @@ const UserManagement: React.FC = () => {
         open={Boolean(anchorEl)}
         onClose={handleMenuClose}
       >
-        <MenuItem onClick={() => selectedUser && handleViewUser(selectedUser)}>
-          <ListItemIcon>
-            <PersonIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>View Details</ListItemText>
-        </MenuItem>
-        <MenuItem onClick={() => selectedUser && handleEditUser(selectedUser)}>
-          <ListItemIcon>
-            <EditIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Edit User</ListItemText>
-        </MenuItem>
-        <MenuItem onClick={() => selectedUser && handleManageAccounts(selectedUser)}>
-          <ListItemIcon>
-            <ManageAccountsIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Manage Accounts & Roles</ListItemText>
-        </MenuItem>
-        <MenuItem onClick={() => selectedUser && handleDeleteUser(selectedUser)}>
-          <ListItemIcon>
-            <DeleteIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Delete User</ListItemText>
-        </MenuItem>
+        {/* View Details — available to anyone who can see the page */}
+        {canViewUsers && (
+          <MenuItem onClick={() => selectedUser && handleViewUser(selectedUser)}>
+            <ListItemIcon>
+              <PersonIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>View Details</ListItemText>
+          </MenuItem>
+        )}
+        {/* Write actions — require ManageUsers */}
+        {canManageUsers && (
+          <MenuItem onClick={() => selectedUser && handleEditUser(selectedUser)}>
+            <ListItemIcon>
+              <EditIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Edit User</ListItemText>
+          </MenuItem>
+        )}
+        {/* Manage accounts on a user — requires ManageUsers */}
+        {canManageUsers && (
+          <MenuItem onClick={() => selectedUser && handleManageAccounts(selectedUser)}>
+            <ListItemIcon>
+              <ManageAccountsIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Manage Accounts & Roles</ListItemText>
+          </MenuItem>
+        )}
+        {/* Session management — requires ManageUsers */}
+        {canManageUsers && (
+          <MenuItem onClick={() => selectedUser && handleManageAdminSessions(selectedUser)}>
+            <ListItemIcon>
+              <DevicesIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Manage Active Sessions</ListItemText>
+          </MenuItem>
+        )}
+        {/* Delete — requires ManageUsers */}
+        {canManageUsers && (
+          <MenuItem onClick={() => selectedUser && handleDeleteUser(selectedUser)}>
+            <ListItemIcon>
+              <DeleteIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Delete User</ListItemText>
+          </MenuItem>
+        )}
       </Menu>
 
       {/* Modals */}
@@ -528,6 +643,15 @@ const UserManagement: React.FC = () => {
         }}
         onError={(message) => {
           setSnackbar({ open: true, message, severity: 'error' });
+        }}
+      />
+
+      <AdminSessionsModal
+        open={adminSessionsModalOpen}
+        username={adminSessionsUsername}
+        onClose={() => {
+          setAdminSessionsModalOpen(false);
+          setAdminSessionsUsername(null);
         }}
       />
     </>

@@ -52,6 +52,7 @@ import {
 } from '@mui/icons-material';
 import ManagementLayout from '../../components/shared/ManagementLayout';
 import { StyledTableHead, StyledTableCell, StyledTableRow } from '../../components/shared/StyledTableComponents';
+import { useScopes } from '@hooks/useScopes';
 import { AccountService, Account as ServiceAccount, AccountSearchParams } from '../../services/accountService';
 // Modal components
 import { CreateAccountModal } from './components/CreateAccountModal';
@@ -68,6 +69,11 @@ interface AccountSearchFilters {
 }
 
 export const AccountManagement: React.FC = () => {
+  const { hasScope, hasAnyScope } = useScopes();
+  const canManageAccounts = hasScope('ManageAccounts');          // POST/PUT/DELETE /accounts
+  const canViewAccounts   = hasAnyScope('ViewAccounts', 'ManageAccounts'); // GET /accounts
+  void canViewAccounts; // page is only reachable when ViewAccounts or ManageAccounts scope exists
+
   // State management
   const [accounts, setAccounts] = useState<ServiceAccount[]>([]);
   const [loading, setLoading] = useState(false);
@@ -76,7 +82,7 @@ export const AccountManagement: React.FC = () => {
 
   // Pagination
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(20);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
 
   // Search and filtering
@@ -342,14 +348,16 @@ export const AccountManagement: React.FC = () => {
         }}>
           Accounts ({totalCount})
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={handleCreateAccount}
-          disabled={loading}
-        >
-          Create Account
-        </Button>
+        {canManageAccounts && (
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={handleCreateAccount}
+            disabled={loading}
+          >
+            Create Account
+          </Button>
+        )}
       </Box>
 
       {/* Error Display */}
@@ -431,21 +439,25 @@ export const AccountManagement: React.FC = () => {
                       >
                         <ViewIcon fontSize="small" />
                       </IconButton>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleEditAccount(account)}
-                        title="Edit Account"
-                      >
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleDeleteAccount(account)}
-                        title="Delete Account"
-                        color="error"
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
+                      {canManageAccounts && (
+                        <IconButton
+                          size="small"
+                          onClick={() => handleEditAccount(account)}
+                          title="Edit Account"
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                      {canManageAccounts && (
+                        <IconButton
+                          size="small"
+                          onClick={() => handleDeleteAccount(account)}
+                          title="Delete Account"
+                          color="error"
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      )}
                     </Box>
                   </TableCell>
                 </StyledTableRow>
@@ -456,13 +468,13 @@ export const AccountManagement: React.FC = () => {
 
       {/* Pagination */}
       <TablePagination
+        rowsPerPageOptions={[5, 10, 25, 50, 100]}
         component="div"
         count={totalCount}
+        rowsPerPage={rowsPerPage}
         page={page}
         onPageChange={handleChangePage}
-        rowsPerPage={rowsPerPage}
         onRowsPerPageChange={handleChangeRowsPerPage}
-        rowsPerPageOptions={[10, 20, 50, 100]}
       />
       </ManagementLayout>
 

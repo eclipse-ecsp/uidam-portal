@@ -27,6 +27,7 @@ import {
   TableContainer,
   TableRow,
   Paper,
+  TablePagination,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -55,6 +56,7 @@ import {
 } from '@mui/icons-material';
 import ManagementLayout from '../../components/shared/ManagementLayout';
 import { StyledTableHead, StyledTableCell, StyledTableRow } from '../../components/shared/StyledTableComponents';
+import { useScopes } from '@hooks/useScopes';
 import { Role, CreateRoleRequest, UpdateRoleRequest, Scope } from '@/types';
 import { RoleService } from '@/services/role.service';
 import { ScopeService } from '@/services/scope.service';
@@ -71,6 +73,9 @@ const MenuProps = {
 };
 
 const RoleManagement: React.FC = () => {
+  const { hasScope } = useScopes();
+  const canManageRoles = hasScope('ManageUserRolesAndPermissions'); // POST/PUT/DELETE /roles
+
   const [roles, setRoles] = useState<Role[]>([]);
   const [availableScopes, setAvailableScopes] = useState<Scope[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,6 +85,11 @@ const RoleManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  
+  // Pagination
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [totalCount, setTotalCount] = useState(0);
   
   // Form state
   const [formData, setFormData] = useState<CreateRoleRequest>({
@@ -101,12 +111,13 @@ const RoleManagement: React.FC = () => {
       
       const filter = searchTerm ? { name: searchTerm } : undefined;
       const response = await roleService.getRoles({
-        page: 0,
-        size: 100,
+        page,
+        size: rowsPerPage,
         filter,
       });
       
       setRoles(response.content);
+      setTotalCount(response.totalElements || response.content.length);
       console.log('Fetched roles:', response.content);
     } catch (err: unknown) {
       console.error('Error fetching roles:', err);
@@ -134,12 +145,24 @@ const RoleManagement: React.FC = () => {
 
   useEffect(() => {
     fetchRoles();
-    fetchAvailableScopes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, rowsPerPage, searchTerm]);
+
+  useEffect(() => {
+    fetchAvailableScopes();
   }, []);
 
   const handleSearch = () => {
-    fetchRoles();
+    setPage(0);
+  };
+
+  const handleChangePage = (_event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
   };
 
   const handleCreate = () => {
@@ -279,21 +302,23 @@ const RoleManagement: React.FC = () => {
               }}
             />
           </Box>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={handleCreate}
-            sx={{
-              borderRadius: 2,
-              textTransform: 'none',
-              background: 'linear-gradient(45deg, #00a6e3, #0080c0)',
-              '&:hover': {
-                background: 'linear-gradient(45deg, #0080c0, #006699)',
-              }
-            }}
-          >
-            Create Role
-          </Button>
+          {canManageRoles && (
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={handleCreate}
+              sx={{
+                borderRadius: 2,
+                textTransform: 'none',
+                background: 'linear-gradient(45deg, #00a6e3, #0080c0)',
+                '&:hover': {
+                  background: 'linear-gradient(45deg, #0080c0, #006699)',
+                }
+              }}
+            >
+              Create Role
+            </Button>
+          )}
         </Box>
 
         {/* Roles Table */}
@@ -427,58 +452,62 @@ const RoleManagement: React.FC = () => {
                   </TableCell>
                   <TableCell align="right">
                     <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
-                      <Tooltip title={isPredefinedRole(role.name) ? "Cannot edit system role" : "Edit role"}>
-                        <span>
-                          <IconButton
-                            size="small"
-                            onClick={() => handleEdit(role)}
-                            disabled={isPredefinedRole(role.name)}
-                            aria-label={isPredefinedRole(role.name) ? "Cannot edit system role" : "Edit role"}
-                            sx={{
-                              backgroundColor: isPredefinedRole(role.name) ? 'action.disabled' : 'primary.main',
-                              color: isPredefinedRole(role.name) ? 'text.disabled' : 'white',
-                              '&:hover': {
-                                backgroundColor: isPredefinedRole(role.name) ? 'action.disabled' : 'primary.dark',
-                              },
-                              '&.Mui-disabled': {
-                                backgroundColor: 'action.disabled',
-                                color: 'text.disabled',
-                              },
-                              borderRadius: 1,
-                              width: 32,
-                              height: 32
-                            }}
-                          >
-                            <EditIcon sx={{ fontSize: 16 }} />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                      <Tooltip title={isPredefinedRole(role.name) ? "Cannot delete system role" : "Delete role"}>
-                        <span>
-                          <IconButton
-                            size="small"
-                            onClick={() => handleDelete(role)}
-                            disabled={isPredefinedRole(role.name)}
-                            aria-label={isPredefinedRole(role.name) ? "Cannot delete system role" : "Delete role"}
-                            sx={{
-                              backgroundColor: isPredefinedRole(role.name) ? 'action.disabled' : 'error.main',
-                              color: isPredefinedRole(role.name) ? 'text.disabled' : 'white',
-                              '&:hover': {
-                                backgroundColor: isPredefinedRole(role.name) ? 'action.disabled' : 'error.dark',
-                              },
-                              '&.Mui-disabled': {
-                                backgroundColor: 'action.disabled',
-                                color: 'text.disabled',
-                              },
-                              borderRadius: 1,
-                              width: 32,
-                              height: 32
-                            }}
-                          >
-                            <DeleteIcon sx={{ fontSize: 16 }} />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
+                      {canManageRoles && (
+                        <Tooltip title={isPredefinedRole(role.name) ? "Cannot edit system role" : "Edit role"}>
+                          <span>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleEdit(role)}
+                              disabled={isPredefinedRole(role.name)}
+                              aria-label={isPredefinedRole(role.name) ? "Cannot edit system role" : "Edit role"}
+                              sx={{
+                                backgroundColor: isPredefinedRole(role.name) ? 'action.disabled' : 'primary.main',
+                                color: isPredefinedRole(role.name) ? 'text.disabled' : 'white',
+                                '&:hover': {
+                                  backgroundColor: isPredefinedRole(role.name) ? 'action.disabled' : 'primary.dark',
+                                },
+                                '&.Mui-disabled': {
+                                  backgroundColor: 'action.disabled',
+                                  color: 'text.disabled',
+                                },
+                                borderRadius: 1,
+                                width: 32,
+                                height: 32
+                              }}
+                            >
+                              <EditIcon sx={{ fontSize: 16 }} />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      )}
+                      {canManageRoles && (
+                        <Tooltip title={isPredefinedRole(role.name) ? "Cannot delete system role" : "Delete role"}>
+                          <span>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleDelete(role)}
+                              disabled={isPredefinedRole(role.name)}
+                              aria-label={isPredefinedRole(role.name) ? "Cannot delete system role" : "Delete role"}
+                              sx={{
+                                backgroundColor: isPredefinedRole(role.name) ? 'action.disabled' : 'error.main',
+                                color: isPredefinedRole(role.name) ? 'text.disabled' : 'white',
+                                '&:hover': {
+                                  backgroundColor: isPredefinedRole(role.name) ? 'action.disabled' : 'error.dark',
+                                },
+                                '&.Mui-disabled': {
+                                  backgroundColor: 'action.disabled',
+                                  color: 'text.disabled',
+                                },
+                                borderRadius: 1,
+                                width: 32,
+                                height: 32
+                              }}
+                            >
+                              <DeleteIcon sx={{ fontSize: 16 }} />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      )}
                     </Box>
                   </TableCell>
                 </StyledTableRow>
@@ -486,7 +515,16 @@ const RoleManagement: React.FC = () => {
           </TableBody>
         </Table>
       </TableContainer>
-
+      {/* Pagination */}
+      <TablePagination
+        rowsPerPageOptions={[5, 10, 25, 50, 100]}
+        component="div"
+        count={totalCount}
+        rowsPerPage={rowsPerPage}
+        page={page}
+        onPageChange={handleChangePage}
+        onRowsPerPageChange={handleChangeRowsPerPage}
+      />
       {/* Create/Edit Role Dialog */}
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>

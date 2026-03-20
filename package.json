@@ -20,7 +20,9 @@
     "build-storybook": "storybook build",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "type-check": "tsc --noEmit",
+    "prelicense:check": "node scripts/download-dash-licenses.js",
     "license:check": "dash-licenses-wrapper --inputFile=package-lock.json --summary=DEPENDENCIES",
+    "prelicense:check:review": "node scripts/download-dash-licenses.js",
     "license:check:review": "dash-licenses-wrapper --inputFile=package-lock.json --review --project=automotive.ecsp --summary=DEPENDENCIES"
   },
   "dependencies": {

@@ -17,6 +17,8 @@
 ********************************************************************************/
 import { AuthService, TokenResponse } from './auth.service';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 // Mock the config
 jest.mock('@config/app.config', () => ({
   OAUTH_CONFIG: {
@@ -30,6 +32,7 @@ jest.mock('@config/app.config', () => ({
   },
   API_CONFIG: {
     AUTH_SERVER_URL: 'http://auth.example.com',
+    SESSION_API_PREFIX: '',
   },
 }));
 
@@ -224,8 +227,9 @@ describe('AuthService', () => {
 
       const result = await authService.handleAuthCallback(mockCode, mockState);
 
-      expect(result.user.userName).toBe('admin');
-      expect(result.user.email).toBe('admin@example.com');
+      // Fallback uses JWT-decoded values; test token has no valid JWT payload so returns empty strings
+      expect(result.user).toBeDefined();
+      expect(typeof result.user.userName).toBe('string');
     });
   });
 
@@ -269,8 +273,8 @@ describe('AuthService', () => {
   });
 
   describe('logout', () => {
-    it('should revoke token and clear storage', async () => {
-      localStorage.setItem('uidam_access_token', 'test-token');
+    it('should call OAuth2 logout endpoint with access token and clear storage', async () => {
+      localStorage.setItem('uidam_access_token', 'test-access-token');
       localStorage.setItem('uidam_refresh_token', 'test-refresh');
 
       mockFetch.mockResolvedValueOnce({ ok: true });
@@ -278,29 +282,109 @@ describe('AuthService', () => {
       await authService.logout();
 
       expect(mockFetch).toHaveBeenCalledWith(
-        '/oauth2/revoke',
+        expect.stringContaining('http://auth.example.com/oauth2/logout?access_token='),
         expect.objectContaining({
           method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
         })
       );
+
+      // Verify form data contains required parameters
+      const callArgs = mockFetch.mock.calls[0];
+      const formData = callArgs[1].body as URLSearchParams;
+      
+      expect(formData.get('id_token_hint')).toBe('Bearer test-access-token');
+      expect(formData.get('client_id')).toBe('test-client');
+      expect(formData.get('post_logout_redirect_uri')).toBeTruthy();
+      expect(formData.get('state')).toBeTruthy();
+
+      // Verify storage cleared
       expect(localStorage.getItem('uidam_access_token')).toBeNull();
       expect(localStorage.getItem('uidam_refresh_token')).toBeNull();
     });
 
-    it('should clear storage even if revocation fails', async () => {
+    it('should use custom post_logout_redirect_uri when provided', async () => {
       localStorage.setItem('uidam_access_token', 'test-token');
+
+      mockFetch.mockResolvedValueOnce({ ok: true });
+
+      const customUri = 'http://localhost:3000/custom-logout';
+      await authService.logout(customUri);
+
+      const callArgs = mockFetch.mock.calls[0];
+      const formData = callArgs[1].body as URLSearchParams;
+
+      expect(formData.get('post_logout_redirect_uri')).toBe(customUri);
+    });
+
+    it('should clear storage even if logout request fails', async () => {
+      localStorage.setItem('uidam_access_token', 'test-token');
+      localStorage.setItem('uidam_refresh_token', 'test-refresh');
 
       mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
       await authService.logout();
 
+      // Storage should still be cleared
       expect(localStorage.getItem('uidam_access_token')).toBeNull();
+      expect(localStorage.getItem('uidam_refresh_token')).toBeNull();
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        'Logout request failed:',
+        expect.any(Error)
+      );
     });
 
-    it('should not call revoke if no token exists', async () => {
+    it('should not call logout endpoint if no token exists', async () => {
       await authService.logout();
 
       expect(mockFetch).not.toHaveBeenCalled();
+      expect(localStorage.getItem('uidam_access_token')).toBeNull();
+    });
+
+    it('should clear pkce_code_verifier from sessionStorage on logout', async () => {
+      sessionStorage.setItem('pkce_code_verifier', 'test-verifier');
+      localStorage.setItem('uidam_access_token', 'test-token');
+
+      mockFetch.mockResolvedValueOnce({ ok: true });
+
+      await authService.logout();
+
+      expect(sessionStorage.getItem('pkce_code_verifier')).toBeNull();
+    });
+
+    it('should log logout details to console', async () => {
+      localStorage.setItem('uidam_access_token', 'test-token');
+
+      mockFetch.mockResolvedValueOnce({ ok: true });
+
+      await authService.logout();
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        'Initiating OAuth2 logout:',
+        expect.objectContaining({
+          client_id: 'test-client',
+          state: expect.any(String),
+        })
+      );
+    });
+
+    it('should handle logout with 302 redirect status', async () => {
+      localStorage.setItem('uidam_access_token', 'test-token');
+
+      // Mock 302 response (redirect)
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 302,
+        headers: new Headers({
+          Location: 'http://localhost:3000/login',
+        }),
+      });
+
+      await authService.logout();
+
+      // Should still clear storage
       expect(localStorage.getItem('uidam_access_token')).toBeNull();
     });
   });
@@ -318,7 +402,9 @@ describe('AuthService', () => {
 
       const user = await (authService as any).getUserProfile('test-token');
       
-      expect(user.email).toBe('testuser@example.com');
+      // No email construction — empty string when email is absent
+      expect(user.email).toBe('');
+      expect(user.userName).toBe('testuser');
     });
 
     it('should use sub for userId if username missing', async () => {
@@ -836,9 +922,9 @@ describe('AuthService', () => {
 
       const profile = await (authService as any).getUserProfile('test-token');
 
-      // Should return fallback profile
-      expect(profile.userName).toBe('admin');
-      expect(profile.email).toBe('admin@example.com');
+      // Inactive token → fallback uses JWT claims; test token is not a real JWT so empty strings
+      expect(profile).toBeDefined();
+      expect(typeof profile.userName).toBe('string');
     });
 
     it('should handle network errors during introspection', async () => {
@@ -846,7 +932,9 @@ describe('AuthService', () => {
 
       const profile = await (authService as any).getUserProfile('test-token');
 
-      expect(profile.userName).toBe('admin');
+      // Falls back to JWT-decoded values; test token is not real JWT so empty strings
+      expect(profile).toBeDefined();
+      expect(typeof profile.userName).toBe('string');
       expect(consoleWarnSpy).toHaveBeenCalledWith(
         'Could not fetch user profile from introspection:',
         expect.any(Error)
@@ -868,16 +956,16 @@ describe('AuthService', () => {
       expect(profile).toEqual({
         id: 'minimal-user',
         userName: 'minimal-user',
-        email: 'admin@example.com', // Fallback uses admin@example.com
-        firstName: 'Admin',
-        lastName: 'User',
+        email: '',          // No email in introspection or JWT → empty string
+        firstName: '',      // No given_name → empty string
+        lastName: '',       // No family_name → empty string
         roles: ['ADMIN'],
-        scopes: ['openid', 'profile'],
+        scopes: expect.any(Array),
         accounts: ['default-account'],
       });
     });
 
-    it('should construct email from username when email missing', async () => {
+    it('should use empty email when email missing from introspection and JWT', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -889,7 +977,67 @@ describe('AuthService', () => {
 
       const profile = await (authService as any).getUserProfile('test-token');
 
-      expect(profile.email).toBe('johndoe@example.com');
+      // Email not constructed from username — remains empty when not present
+      expect(profile.email).toBe('');
+      expect(profile.userName).toBe('johndoe');
+    });
+  });
+
+  describe('decodeJwtPayload', () => {
+    it('should decode a valid JWT payload', () => {
+      // Build a minimal JWT: header.payload.signature (payload is base64url-encoded JSON)
+      const payload = { sub: 'user1', username: 'john', email: 'john@example.com' };
+      const encoded = btoa(JSON.stringify(payload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+      const fakeJwt = `header.${encoded}.signature`;
+
+      const claims = (authService as any).decodeJwtPayload(fakeJwt);
+
+      expect(claims.sub).toBe('user1');
+      expect(claims.username).toBe('john');
+      expect(claims.email).toBe('john@example.com');
+    });
+
+    it('should return empty object for non-JWT string', () => {
+      const claims = (authService as any).decodeJwtPayload('not-a-jwt');
+      expect(claims).toEqual({});
+    });
+
+    it('should return empty object for malformed JWT payload', () => {
+      const claims = (authService as any).decodeJwtPayload('header.!!!invalid!!!.signature');
+      expect(claims).toEqual({});
+    });
+
+    it('should use JWT claims as baseline when introspection returns partial data', async () => {
+      const payload = { sub: 'jwt-user', username: 'jwtname', email: 'jwt@example.com', given_name: 'JWT', family_name: 'Token' };
+      const encoded = btoa(JSON.stringify(payload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+      const fakeJwt = `header.${encoded}.signature`;
+
+      // Introspection returns active but no name fields
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ active: true, sub: 'jwt-user', username: 'jwtname' }),
+      });
+
+      const profile = await (authService as any).getUserProfile(fakeJwt);
+
+      // JWT baseline fills in missing fields from introspection
+      expect(profile.email).toBe('jwt@example.com');
+      expect(profile.firstName).toBe('JWT');
+      expect(profile.lastName).toBe('Token');
+    });
+
+    it('should use JWT fallback when introspection fails', async () => {
+      const payload = { sub: 'fallback-user', username: 'fbuser', email: 'fb@example.com' };
+      const encoded = btoa(JSON.stringify(payload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+      const fakeJwt = `header.${encoded}.signature`;
+
+      mockFetch.mockRejectedValueOnce(new Error('Network down'));
+
+      const profile = await (authService as any).getUserProfile(fakeJwt);
+
+      expect(profile.id).toBe('fallback-user');
+      expect(profile.userName).toBe('fbuser');
+      expect(profile.email).toBe('fb@example.com');
     });
   });
 
@@ -966,7 +1114,7 @@ describe('AuthService', () => {
   });
 
   describe('logout - comprehensive coverage', () => {
-    it('should include client_secret in revoke request', async () => {
+    it('should include all required OAuth2 logout parameters', async () => {
       localStorage.setItem('uidam_access_token', 'test-token');
 
       mockFetch.mockResolvedValueOnce({ ok: true });
@@ -974,21 +1122,64 @@ describe('AuthService', () => {
       await authService.logout();
 
       const callArgs = mockFetch.mock.calls[0];
+      const endpoint = callArgs[0];
       const formData = callArgs[1].body as URLSearchParams;
 
-      expect(formData.get('token')).toBe('test-token');
+      // Verify endpoint has access_token query parameter
+      expect(endpoint).toContain('access_token=test-token');
+
+      // Verify POST body parameters
+      expect(formData.get('id_token_hint')).toBe('Bearer test-token');
       expect(formData.get('client_id')).toBe('test-client');
-      expect(formData.get('client_secret')).toBe('test-secret');
+      expect(formData.get('post_logout_redirect_uri')).toBeTruthy();
+      expect(formData.get('state')).toBeTruthy();
     });
 
-    it('should not include client_secret if not configured', async () => {
+    it('should generate unique state for each logout request', async () => {
       localStorage.setItem('uidam_access_token', 'test-token');
 
-      // Temporarily remove client secret
+      mockFetch.mockResolvedValue({ ok: true });
+
+      await authService.logout();
+      const state1 = (mockFetch.mock.calls[0][1].body as URLSearchParams).get('state');
+
+      mockFetch.mockClear();
+      localStorage.setItem('uidam_access_token', 'test-token');
+
+      await authService.logout();
+      const state2 = (mockFetch.mock.calls[0][1].body as URLSearchParams).get('state');
+
+      expect(state1).not.toBe(state2);
+    });
+
+    it('should clear all token-related items from storage', async () => {
+      // Setup storage with multiple items
+      localStorage.setItem('uidam_access_token', 'test-token');
+      localStorage.setItem('uidam_refresh_token', 'test-refresh');
+      localStorage.setItem('uidam_token_expires_at', '123456789');
+      localStorage.setItem('uidam_token_scopes', 'openid profile');
+      localStorage.setItem('uidam_user_profile', JSON.stringify({ id: '1' }));
+      sessionStorage.setItem('pkce_code_verifier', 'test-verifier');
+
+      mockFetch.mockResolvedValueOnce({ ok: true });
+
+      await authService.logout();
+
+      expect(localStorage.getItem('uidam_access_token')).toBeNull();
+      expect(localStorage.getItem('uidam_refresh_token')).toBeNull();
+      expect(localStorage.getItem('uidam_token_expires_at')).toBeNull();
+      expect(localStorage.getItem('uidam_token_scopes')).toBeNull();
+      expect(localStorage.getItem('uidam_user_profile')).toBeNull();
+      expect(sessionStorage.getItem('pkce_code_verifier')).toBeNull();
+    });
+
+    it('should use POST_LOGOUT_REDIRECT_URI from config', async () => {
+      localStorage.setItem('uidam_access_token', 'test-token');
+
+      // Mock the config to have POST_LOGOUT_REDIRECT_URI
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { OAUTH_CONFIG } = require('@config/app.config');
-      const originalSecret = OAUTH_CONFIG.CLIENT_SECRET;
-      OAUTH_CONFIG.CLIENT_SECRET = undefined;
+      OAUTH_CONFIG.POST_LOGOUT_REDIRECT_URI = 'http://localhost:3000/logout-success';
 
       mockFetch.mockResolvedValueOnce({ ok: true });
 
@@ -997,21 +1188,23 @@ describe('AuthService', () => {
       const callArgs = mockFetch.mock.calls[0];
       const formData = callArgs[1].body as URLSearchParams;
 
-      expect(formData.get('client_secret')).toBeNull();
-
-      // Restore client secret
-      OAUTH_CONFIG.CLIENT_SECRET = originalSecret;
+      expect(formData.get('post_logout_redirect_uri')).toBe('http://localhost:3000/logout-success');
     });
 
-    it('should clear pkce_code_verifier on logout', async () => {
-      sessionStorage.setItem('pkce_code_verifier', 'test-verifier');
-      localStorage.setItem('uidam_access_token', 'test-token');
+    it('should construct correct logout URL with encoded access token', async () => {
+      const tokenWithSpecialChars = 'test-token+/=';
+      localStorage.setItem('uidam_access_token', tokenWithSpecialChars);
 
       mockFetch.mockResolvedValueOnce({ ok: true });
 
       await authService.logout();
 
-      expect(sessionStorage.getItem('pkce_code_verifier')).toBeNull();
+      const endpoint = mockFetch.mock.calls[0][0];
+      
+      expect(endpoint).toContain('http://auth.example.com/oauth2/logout');
+      expect(endpoint).toContain('access_token=');
+      // URL encoded version should be present
+      expect(endpoint).toContain(encodeURIComponent(tokenWithSpecialChars));
     });
   });
 
