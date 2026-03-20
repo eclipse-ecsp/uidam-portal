@@ -55,32 +55,17 @@ export class SessionService {
   }
 
   /**
-   * Returns true when running on localhost (Vite dev server).
-   * In dev, we call the auth server directly to avoid Vite proxy stripping
-   * the headers the auth server needs for tenant resolution.
-   * In production, we use a relative URL so nginx proxies the request
-   * (same-origin, no CORS).
-   * @returns {boolean} True if running on localhost
-   */
-  private static isDev(): boolean {
-    const host = window.location.hostname;
-    return host === 'localhost' || host === '127.0.0.1';
-  }
-
-  /**
    * Shared fetch helper.
-   * - Dev:  calls auth server directly (full URL) — avoids Vite proxy TENANT_RESOLUTION_FAILED
-   * - Prod: uses relative URL — proxied by nginx to the auth server (no CORS)
-   * Only sends Authorization + Content-Type (no user-id / X-Correlation-ID).
+   * Always calls the auth server directly using REACT_APP_UIDAM_AUTH_SERVER_URL.
+   * CORS is handled by the auth server (Access-Control-Allow-Origin is configured).
+   * Only sends Authorization + Content-Type.
    * @param {string} path - Path relative to auth server (e.g. /sdp/self/tokens/active)
    * @param {RequestInit} options - Fetch options
    * @returns {Promise<T>} Parsed JSON response
    */
   private static async request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const token = this.getToken();
-    const url = this.isDev()
-      ? `${API_CONFIG.AUTH_SERVER_URL}${path}` // direct call in dev
-      : path;                                   // relative URL in prod (nginx proxies)
+    const url = `${API_CONFIG.AUTH_SERVER_URL}${path}`;
     console.log('Session API request:', options.method ?? 'GET', url);
 
     const response = await fetch(url, {
@@ -107,12 +92,36 @@ export class SessionService {
   }
 
   /**
+   * Maps the raw API response shape { status, data: { tokens, totalTokens } }
+   * to the internal SessionsResponse shape { sessions, totalCount }.
+   */
+  private static mapTokensResponse(raw: any): SessionsResponse {
+    const tokens: any[] = raw?.data?.tokens ?? [];
+    return {
+      sessions: tokens.map((t: any) => ({
+        sessionId: t.id,
+        deviceInfo: t.deviceInfo ?? '',
+        loginTime: t.accessTokenIssuedAt,
+        lastActivity: t.accessTokenExpiresAt,
+        isCurrent: t.isCurrentSession ?? false,
+        ipAddress: t.ipAddress,
+        browser: t.browser,
+        os: t.os,
+        location: t.location,
+        userAgent: t.userAgent,
+      })),
+      totalCount: raw?.data?.totalTokens ?? 0,
+    };
+  }
+
+  /**
    * Get all active sessions for the current user.
    * @returns {Promise<SessionsResponse>} List of active sessions
    */
   static async getActiveSessions(): Promise<SessionsResponse> {
     const path = `${this.getPrefix()}/self/tokens/active`;
-    return this.request<SessionsResponse>(path, { method: 'GET' });
+    const raw = await this.request<any>(path, { method: 'GET' });
+    return SessionService.mapTokensResponse(raw);
   }
 
   /**
@@ -132,7 +141,8 @@ export class SessionService {
    */
   static async getAdminActiveSessions(username: string): Promise<SessionsResponse> {
     const path = `${this.getPrefix()}/admin/tokens/active`;
-    return this.request<SessionsResponse>(path, { method: 'POST', body: JSON.stringify({ username }) });
+    const raw = await this.request<any>(path, { method: 'POST', body: JSON.stringify({ username }) });
+    return SessionService.mapTokensResponse(raw);
   }
 
   /**
