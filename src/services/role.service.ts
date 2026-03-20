@@ -25,8 +25,7 @@ import {
 } from '@/types';
 import { API_CONFIG } from '@/config/app.config';
 import { userManagementApi } from './api-client';
-import { createResource, updateResource, deleteResource, getResource, buildQueryParams } from '@/utils/serviceHelpers';
-import { fetchWithTokenRefresh } from './apiUtils';
+import { createResource, updateResource, deleteResource, getResource, fetchPaginatedFilteredResources } from '@/utils/serviceHelpers';
 
 /**
  * Service class for managing role operations
@@ -40,84 +39,13 @@ export class RoleService {
    * @throws Error if the API request fails
    */
   async getRoles(params: FilterParams & { filter?: RoleFilterRequest }): Promise<PaginatedResponse<Role>> {
-    // Build filter request - backend requires roles field even if empty
-    const filterRequest: Record<string, string[]> = {
-      roles: params.filter?.name ? [params.filter.name] : []
-    };
-
-    const queryParams = buildQueryParams({
-      page: params.page,
-      pageSize: params.size,
+    return fetchPaginatedFilteredResources<Role>({
+      urlPath: `${API_CONFIG.API_BASE_URL}/v1/roles/filter`,
+      filterKey: 'roles',
+      filterName: params.filter?.name,
+      params,
+      serviceLabel: 'Role Service',
     });
-
-    const urlPath = `${API_CONFIG.API_BASE_URL}/v1/roles/filter`;
-    const finalUrl = queryParams ? `${urlPath}?${new URLSearchParams(queryParams)}` : urlPath;
-
-    const correlationId = crypto.randomUUID();
-    console.log('Role Service - Getting roles:', { url: finalUrl, filterRequest, correlationId });
-
-    try {
-      const response = await fetchWithTokenRefresh(finalUrl, {
-        method: 'POST',
-        headers: {
-          'X-Correlation-ID': correlationId,
-        },
-        body: JSON.stringify(filterRequest),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Role Service - HTTP error:', { status: response.status, error: errorText, correlationId });
-        throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
-      }
-
-      const data: { results?: Role[]; messages?: string[] } = await response.json();
-      const results = data.results || [];
-      
-      console.log('Role Service - Success:', { resultsCount: results.length, correlationId });
-      
-      // Get total count for pagination
-      let totalCount = results.length;
-      
-      // If we got a full page of results, there might be more - fetch total count
-      if (results.length === params.size) {
-        try {
-          const totalResponse = await fetchWithTokenRefresh(`${urlPath}?page=0&pageSize=10000`, {
-            method: 'POST',
-            headers: {
-              'X-Correlation-ID': crypto.randomUUID(),
-            },
-            body: JSON.stringify(filterRequest),
-          });
-          
-          if (totalResponse.ok) {
-            const totalData: { results?: Role[] } = await totalResponse.json();
-            totalCount = (totalData.results || []).length;
-            console.log('Role Service - Total count fetched:', totalCount);
-          }
-        } catch (error) {
-          console.warn('Role Service - Failed to get total count, using current results:', error);
-          // If total count fetch fails, estimate based on current page
-          totalCount = params.page * params.size + results.length;
-        }
-      } else {
-        // Current page has fewer results than requested, so we know the total
-        totalCount = params.page * params.size + results.length;
-      }
-      
-      return {
-        content: results,
-        totalElements: totalCount,
-        totalPages: Math.ceil(totalCount / params.size),
-        size: params.size,
-        number: params.page,
-        first: params.page === 0,
-        last: params.page >= Math.ceil(totalCount / params.size) - 1,
-      };
-    } catch (error: unknown) {
-      console.error('Role Service - Error details:', { error, correlationId });
-      throw error instanceof Error ? error : new Error('Failed to fetch roles');
-    }
   }
 
   /**
