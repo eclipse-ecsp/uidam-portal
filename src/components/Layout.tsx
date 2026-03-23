@@ -56,9 +56,10 @@ import { toggleSidebar } from '@store/slices/uiSlice';
 import { logout, updateUser } from '@store/slices/authSlice';
 import { useTheme } from '@hooks/useTheme';
 import { useScopes } from '@hooks/useScopes';
-import { FEATURE_FLAGS } from '@config/app.config';
+import { FEATURE_FLAGS, OAUTH_CONFIG } from '@config/app.config';
 import { UserService } from '@services/userService';
 import { authService } from '@services/auth.service';
+import { SessionService } from '@services/sessionService';
 
 const drawerWidth = 240;
 
@@ -123,13 +124,6 @@ const navigationItems = [
     feature: true,
     requiredScopes: [] as string[],
   },
-  {
-    text: 'Active Sessions',
-    icon: <DevicesIcon />,
-    path: '/uidam/sessions',
-    feature: true,
-    requiredScopes: [] as string[],
-  },
 ].filter(item => item.feature);
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
@@ -155,6 +149,43 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   React.useEffect(() => {
     setAnchorEl(null);
   }, [location.pathname]);
+
+  // Cross-tab logout detection via the browser Storage event.
+  // The browser fires a 'storage' event on every OTHER tab/window in the same
+  // origin whenever localStorage changes. When Window 1 logs out and removes
+  // the access token, Window 2 receives this event immediately and logs out too
+  // — no page refresh, no polling delay.
+  React.useEffect(() => {
+    const handleStorageChange = (event: StorageEvent) => {
+      if (
+        event.storageArea === localStorage &&
+        event.key === OAUTH_CONFIG.TOKEN_STORAGE_KEY &&
+        event.newValue === null          // key was removed
+      ) {
+        dispatch(logout());
+        navigate('/login');
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [dispatch, navigate]);
+
+  // Session validity heartbeat — polls every 30 s to detect remote token revocation.
+  // If the token was invalidated server-side (e.g. another admin terminated this
+  // session), SessionService.request() will clear localStorage and redirect to /login.
+  // Any other error (network, 5xx) is silently ignored so normal usage is unaffected.
+  React.useEffect(() => {
+    const HEARTBEAT_INTERVAL = 30_000;
+    const id = setInterval(async () => {
+      try {
+        await SessionService.getActiveSessions();
+      } catch {
+        // 401 → SessionService already cleared tokens and redirected.
+        // Other transient errors are intentionally swallowed here.
+      }
+    }, HEARTBEAT_INTERVAL);
+    return () => clearInterval(id);
+  }, []);
 
   // Fetch full user profile on mount to get firstName and lastName
   React.useEffect(() => {
