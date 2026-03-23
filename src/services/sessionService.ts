@@ -19,6 +19,29 @@ import { SessionsResponse } from '@/types';
 import { getConfig } from '@config/runtimeConfig';
 import { API_CONFIG, OAUTH_CONFIG } from '@config/app.config';
 
+/** Shape of a single token entry returned by the backend. */
+interface RawToken {
+  id: string;
+  deviceInfo?: string;
+  accessTokenIssuedAt: string;
+  accessTokenExpiresAt: string;
+  isCurrentSession?: boolean;
+  ipAddress?: string;
+  browser?: string;
+  os?: string;
+  location?: string;
+  userAgent?: string;
+}
+
+/** Shape of the raw API response from the tokens endpoints. */
+interface RawTokensResponse {
+  status?: string;
+  data?: {
+    tokens?: RawToken[];
+    totalTokens?: number;
+  };
+}
+
 /**
  * Service for managing user active sessions.
  *
@@ -80,6 +103,18 @@ export class SessionService {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Session API error:', response.status, errorText);
+
+      // Token has been revoked server-side (e.g. an admin terminated this session).
+      // Clear all local credentials immediately and force a re-login so the
+      // browser reflects the revocation without waiting for the next full page load.
+      if (response.status === 401) {
+        localStorage.removeItem(OAUTH_CONFIG.TOKEN_STORAGE_KEY);
+        localStorage.removeItem(OAUTH_CONFIG.REFRESH_TOKEN_STORAGE_KEY);
+        localStorage.removeItem('uidam_token_expires_at');
+        localStorage.removeItem('uidam_user_profile');
+        window.location.href = '/login';
+      }
+
       throw new Error(`Session API error ${response.status}: ${errorText}`);
     }
 
@@ -94,11 +129,13 @@ export class SessionService {
   /**
    * Maps the raw API response shape { status, data: { tokens, totalTokens } }
    * to the internal SessionsResponse shape { sessions, totalCount }.
+   * @param {RawTokensResponse} raw - Raw API response
+   * @returns {SessionsResponse} Mapped sessions response
    */
-  private static mapTokensResponse(raw: any): SessionsResponse {
-    const tokens: any[] = raw?.data?.tokens ?? [];
+  private static mapTokensResponse(raw: RawTokensResponse): SessionsResponse {
+    const tokens: RawToken[] = raw?.data?.tokens ?? [];
     return {
-      sessions: tokens.map((t: any) => ({
+      sessions: tokens.map((t: RawToken) => ({
         sessionId: t.id,
         deviceInfo: t.deviceInfo ?? '',
         loginTime: t.accessTokenIssuedAt,
@@ -120,7 +157,7 @@ export class SessionService {
    */
   static async getActiveSessions(): Promise<SessionsResponse> {
     const path = `${this.getPrefix()}/self/tokens/active`;
-    const raw = await this.request<any>(path, { method: 'GET' });
+    const raw = await this.request<RawTokensResponse>(path, { method: 'GET' });
     return SessionService.mapTokensResponse(raw);
   }
 
@@ -141,7 +178,7 @@ export class SessionService {
    */
   static async getAdminActiveSessions(username: string): Promise<SessionsResponse> {
     const path = `${this.getPrefix()}/admin/tokens/active`;
-    const raw = await this.request<any>(path, { method: 'POST', body: JSON.stringify({ username }) });
+    const raw = await this.request<RawTokensResponse>(path, { method: 'POST', body: JSON.stringify({ username }) });
     return SessionService.mapTokensResponse(raw);
   }
 
