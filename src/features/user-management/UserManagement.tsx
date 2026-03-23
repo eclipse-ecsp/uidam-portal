@@ -54,6 +54,8 @@ import {
   FilterList as FilterListIcon,
   Devices as DevicesIcon,
 } from '@mui/icons-material';
+import { useSelector } from 'react-redux';
+import { RootState } from '@store/index';
 import ManagementLayout from '../../components/shared/ManagementLayout';
 import { StyledTableHead, StyledTableCell, StyledTableRow } from '../../components/shared/StyledTableComponents';
 import { useScopes } from '@hooks/useScopes';
@@ -69,6 +71,7 @@ const UserManagement: React.FC = () => {
   const { hasScope, hasAnyScope } = useScopes();
   const canManageUsers = hasScope('ManageUsers');        // POST/PUT/DELETE /users
   const canViewUsers   = hasAnyScope('ViewUsers', 'ManageUsers'); // GET /users
+  const { user: currentUser } = useSelector((state: RootState) => state.auth);
 
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
@@ -566,8 +569,8 @@ const UserManagement: React.FC = () => {
             <ListItemText>Manage Accounts & Roles</ListItemText>
           </MenuItem>
         )}
-        {/* Session management — requires ManageUsers */}
-        {canManageUsers && (
+        {/* Session management — requires ManageUsers; hidden for the logged-in admin's own row */}
+        {canManageUsers && selectedUser?.userName !== currentUser?.userName && (
           <MenuItem onClick={() => selectedUser && handleManageAdminSessions(selectedUser)}>
             <ListItemIcon>
               <DevicesIcon fontSize="small" />

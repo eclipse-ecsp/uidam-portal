@@ -157,6 +157,49 @@ export interface UserMetaDataRequest {
  */
 export class UserService {
   /**
+   * Decodes the JWT token from localStorage and extracts the user_id claim.
+   * @returns {string | null} The user ID from the token, or null if it cannot be extracted
+   * @throws {Error} If no authentication token is found in localStorage
+   */
+  private static extractUserIdFromToken(): string | null {
+    const token = localStorage.getItem('uidam_admin_token');
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+    let userId: string | null = null;
+    try {
+      const tokenParts = token.split('.');
+      if (tokenParts.length === 3) {
+        const payload = tokenParts[1];
+        const decodedPayload = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+        const claims = JSON.parse(decodedPayload);
+        userId = claims.user_id;
+      }
+    } catch (error) {
+      console.error('Failed to decode JWT token:', error);
+    }
+    return userId;
+  }
+
+  /**
+   * Builds a URL with search query parameters from UserSearchParams.
+   * @param {string} urlPath - The base URL path
+   * @param {UserSearchParams} [params] - Optional pagination and sorting parameters
+   * @returns {string} The final URL with query string appended if params are provided
+   */
+  private static buildFilterUrl(urlPath: string, params?: UserSearchParams): string {
+    const urlParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          urlParams.append(key, value.toString());
+        }
+      });
+    }
+    return urlParams.toString() ? `${urlPath}?${urlParams.toString()}` : urlPath;
+  }
+
+  /**
    * Creates a new user using V1 API
    * @param {CreateUserV1Request} user - The user data for creation
    * @returns {Promise<ApiResponse<User>>} The API response containing the created user
@@ -221,19 +264,7 @@ export class UserService {
    * @returns {Promise<ApiResponse<User[]>>} The API response containing filtered users
    */
   static async filterUsersV1(filter: UsersFilterV1, params?: UserSearchParams): Promise<ApiResponse<User[]>> {
-    const urlPath = `${API_CONFIG.API_BASE_URL}/v1/users/filter`;
-    
-    const urlParams = new URLSearchParams();
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined) {
-          urlParams.append(key, value.toString());
-        }
-      });
-    }
-    
-    const finalUrl = urlParams.toString() ? `${urlPath}?${urlParams.toString()}` : urlPath;
-
+    const finalUrl = UserService.buildFilterUrl(`${API_CONFIG.API_BASE_URL}/v1/users/filter`, params);
     const response = await fetchWithTokenRefresh(finalUrl, {
       method: 'POST',
       body: JSON.stringify(filter),
@@ -292,20 +323,7 @@ export class UserService {
    * @throws {Error} If the API request fails or returns an error status
    */
   static async filterUsersV2(filter: UsersFilterV2, params?: UserSearchParams): Promise<User[]> {
-    // Use full URL with API base
-    const urlPath = `${API_CONFIG.API_BASE_URL}/v2/users/filter`;
-    
-    // Add query parameters if provided
-    const urlParams = new URLSearchParams();
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined) {
-          urlParams.append(key, value.toString());
-        }
-      });
-    }
-    
-    const finalUrl = urlParams.toString() ? `${urlPath}?${urlParams.toString()}` : urlPath;
+    const finalUrl = UserService.buildFilterUrl(`${API_CONFIG.API_BASE_URL}/v2/users/filter`, params);
 
     const response = await fetchWithTokenRefresh(finalUrl, {
       method: 'POST',
@@ -461,36 +479,11 @@ export class UserService {
    * @returns {Promise<ApiResponse<User>>} The API response containing the current user's details
    */
   static async getSelfUser(): Promise<ApiResponse<User>> {
-    const token = localStorage.getItem('uidam_admin_token');
-    
-    if (!token) {
-      throw new Error('Authentication token not found');
-    }
-
-    // Decode JWT token to extract user_id
-    let userId: string | null = null;
-    try {
-      // JWT tokens have 3 parts separated by dots: header.payload.signature
-      const tokenParts = token.split('.');
-      if (tokenParts.length === 3) {
-        // Decode the payload (middle part)
-        const payload = tokenParts[1];
-        const decodedPayload = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
-        const claims = JSON.parse(decodedPayload);
-        
-        // Extract user_id from the token claims
-        userId = claims.user_id;
-        console.log('Decoded user_id from token:', userId);
-      }
-    } catch (error) {
-      console.error('Failed to decode JWT token:', error);
-    }
+    const userId = UserService.extractUserIdFromToken();
 
     // Build headers
     const baseHeaders = getApiHeaders();
     const headers: Record<string, string> = {};
-    
-    // Copy headers from baseHeaders
     if (baseHeaders instanceof Headers) {
       baseHeaders.forEach((value, key) => {
         headers[key] = value;
@@ -499,10 +492,8 @@ export class UserService {
       Object.assign(headers, baseHeaders);
     }
 
-    // Add user-id header if we successfully decoded it
     if (userId) {
       headers['user-id'] = userId;
-      console.log('Added user-id header:', userId);
     } else {
       console.warn('Could not extract user_id from token');
     }
@@ -521,30 +512,11 @@ export class UserService {
    * @returns {Promise<ApiResponse<User>>} The API response containing the updated user details
    */
   static async updateSelfUser(patches: JsonPatchOperation[]): Promise<ApiResponse<User>> {
-    const token = localStorage.getItem('uidam_admin_token');
-    
-    if (!token) {
-      throw new Error('Authentication token not found');
-    }
-
-    // Decode JWT token to extract user_id
-    let userId: string | null = null;
-    try {
-      const tokenParts = token.split('.');
-      if (tokenParts.length === 3) {
-        const payload = tokenParts[1];
-        const decodedPayload = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
-        const claims = JSON.parse(decodedPayload);
-        userId = claims.user_id;
-      }
-    } catch (error) {
-      console.error('Failed to decode JWT token:', error);
-    }
+    const userId = UserService.extractUserIdFromToken();
 
     // Build headers
     const baseHeaders = getApiHeaders();
     const headers: Record<string, string> = {};
-    
     if (baseHeaders instanceof Headers) {
       baseHeaders.forEach((value, key) => {
         headers[key] = value;
@@ -553,7 +525,6 @@ export class UserService {
       Object.assign(headers, baseHeaders);
     }
 
-    // Add user-id header
     if (userId) {
       headers['user-id'] = userId;
     }
@@ -650,26 +621,7 @@ export class UserService {
    * @throws {Error} If password reset request fails
    */
   static async requestPasswordReset(): Promise<ApiResponse<string>> {
-    const token = localStorage.getItem('uidam_admin_token');
-    
-    if (!token) {
-      throw new Error('Authentication token not found');
-    }
-
-    // Decode JWT token to extract user_id
-    let userId: string | null = null;
-    try {
-      const tokenParts = token.split('.');
-      if (tokenParts.length === 3) {
-        const payload = tokenParts[1];
-        const decodedPayload = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
-        const claims = JSON.parse(decodedPayload);
-        userId = claims.user_id;
-        console.log('Decoded user_id from token for password reset:', userId);
-      }
-    } catch (error) {
-      console.error('Failed to decode JWT token:', error);
-    }
+    const userId = UserService.extractUserIdFromToken();
 
     // Build headers with user-id
     const headers: Record<string, string> = {
@@ -678,7 +630,6 @@ export class UserService {
 
     if (userId) {
       headers['user-id'] = userId;
-      console.log('Added user-id header for password reset:', userId);
     } else {
       console.warn('Could not extract user_id from token for password reset');
       throw new Error('Failed to extract user ID from authentication token');
