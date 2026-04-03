@@ -146,7 +146,7 @@ class ApiClient {
           }
         }
 
-        return Promise.reject(error instanceof Error ? error : new Error(String(error)));
+        throw (error instanceof Error ? error : new Error(String(error)));
       }
     );
   }
