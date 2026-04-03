@@ -615,6 +615,31 @@ export class UserService {
 
   // Password Management
   /**
+   * Resolves a human-readable error message for a failed password-reset HTTP response.
+   * @param {number} status - The HTTP response status code.
+   * @param {object} [errorData] - Optional parsed error body from the response.
+   * @returns {string} A user-friendly error message.
+   */
+  private static getPasswordResetErrorMessage(status: number, errorData?: { message?: string; code?: string }): string {
+    if (errorData?.message) {
+      if (errorData.message.includes('Mail server connection failed') ||
+          errorData.message.includes('SMTP') ||
+          errorData.message.includes('smtp.gmail.com')) {
+        return 'Email service is temporarily unavailable. Please contact your system administrator or try again later.';
+      }
+      if (errorData.code === 'INTERNAL_SERVER_ERROR') {
+        return 'Server error occurred. Please contact your system administrator.';
+      }
+      return errorData.message;
+    }
+    if (status === 429) return 'Too many password reset requests. Please try again later.';
+    if (status === 404) return 'User account not found.';
+    if (status === 400) return 'Invalid request. Please try again.';
+    if (status === 500) return 'Server error occurred. Please contact your system administrator.';
+    return 'Failed to initiate password reset';
+  }
+
+  /**
    * Request password reset for the current user
    * Sends an email with password reset link
    * @returns {Promise<ApiResponse<string>>} Success message
@@ -649,37 +674,10 @@ export class UserService {
       try {
         const errorData = await response.json();
         console.error('Password reset request failed:', response.status, errorData);
-        
-        // Check for specific error messages from backend
-        if (errorData.message) {
-          if (errorData.message.includes('Mail server connection failed') || 
-              errorData.message.includes('SMTP') || 
-              errorData.message.includes('smtp.gmail.com')) {
-            errorMessage = 'Email service is temporarily unavailable. Please contact your system administrator or try again later.';
-          } else if (errorData.code === 'INTERNAL_SERVER_ERROR') {
-            errorMessage = 'Server error occurred. Please contact your system administrator.';
-          } else {
-            errorMessage = errorData.message;
-          }
-        } else if (response.status === 429) {
-          errorMessage = 'Too many password reset requests. Please try again later.';
-        } else if (response.status === 404) {
-          errorMessage = 'User account not found.';
-        } else if (response.status === 400) {
-          errorMessage = 'Invalid request. Please try again.';
-        }
+        errorMessage = UserService.getPasswordResetErrorMessage(response.status, errorData);
       } catch (parseError) {
-        // If response is not JSON, try to get text
         console.error('Failed to parse error response:', parseError);
-        if (response.status === 429) {
-          errorMessage = 'Too many password reset requests. Please try again later.';
-        } else if (response.status === 404) {
-          errorMessage = 'User account not found.';
-        } else if (response.status === 400) {
-          errorMessage = 'Invalid request. Please try again.';
-        } else if (response.status === 500) {
-          errorMessage = 'Server error occurred. Please contact your system administrator.';
-        }
+        errorMessage = UserService.getPasswordResetErrorMessage(response.status);
       }
       
       throw new Error(errorMessage);

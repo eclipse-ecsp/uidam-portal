@@ -69,10 +69,8 @@ interface AccountSearchFilters {
 }
 
 export const AccountManagement: React.FC = () => {
-  const { hasScope, hasAnyScope } = useScopes();
+  const { hasScope } = useScopes();
   const canManageAccounts = hasScope('ManageAccounts');          // POST/PUT/DELETE /accounts
-  const canViewAccounts   = hasAnyScope('ViewAccounts', 'ManageAccounts'); // GET /accounts
-  void canViewAccounts; // page is only reachable when ViewAccounts or ManageAccounts scope exists
 
   // State management
   const [accounts, setAccounts] = useState<ServiceAccount[]>([]);

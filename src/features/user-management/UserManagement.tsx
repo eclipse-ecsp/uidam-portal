@@ -67,6 +67,42 @@ import DeleteUserDialog from './components/DeleteUserDialog';
 import ManageUserAccountsModal from './components/ManageUserAccountsModal';
 import AdminSessionsModal from './components/AdminSessionsModal';
 
+const extractUsersList = (response: unknown): User[] => {
+  if (Array.isArray(response)) {
+    return response as User[];
+  }
+  if (response && typeof response === 'object' && 'data' in response) {
+    const dataResponse = response as { data?: unknown };
+    if (Array.isArray(dataResponse.data)) {
+      return dataResponse.data as User[];
+    }
+  }
+  return [];
+};
+
+const fetchTotalCount = async (
+  filter: UsersFilterV2,
+  searchParams: UserSearchParams,
+  currentPageSize: number,
+  currentPage: number,
+  currentListLength: number,
+): Promise<number> => {
+  if (currentListLength === currentPageSize) {
+    try {
+      const totalResponse = await UserService.filterUsersV2(filter, {
+        ...searchParams,
+        pageNumber: 0,
+        pageSize: 10000,
+      });
+      return extractUsersList(totalResponse).length;
+    } catch (error) {
+      console.error('Failed to get total count:', error);
+      return currentListLength;
+    }
+  }
+  return currentPage * currentPageSize + currentListLength;
+};
+
 const UserManagement: React.FC = () => {
   const { hasScope, hasAnyScope } = useScopes();
   const canManageUsers = hasScope('ManageUsers');        // POST/PUT/DELETE /users
@@ -106,16 +142,12 @@ const UserManagement: React.FC = () => {
     const minLoadingTime = 500; // Minimum 500ms to show loader
     
     try {
-      // Build filter object
       const filter: UsersFilterV2 = {};
       
-      // Add search filter if search term exists
       if (searchTerm?.trim()) {
-        const search = searchTerm.trim();
-        filter.userNames = [search];
+        filter.userNames = [searchTerm.trim()];
       }
       
-      // Add status filter if selected
       if (statusFilter) {
         filter.status = [statusFilter as 'PENDING' | 'BLOCKED' | 'REJECTED' | 'ACTIVE' | 'DELETED' | 'DEACTIVATED'];
       }
@@ -130,57 +162,14 @@ const UserManagement: React.FC = () => {
       };
 
       try {
-        // Call the real API
         const response = await UserService.filterUsersV2(filter, searchParams);
         console.log('API Response:', response);
         
-        // Handle different response formats
-        let usersList: User[] = [];
-        
-        if (Array.isArray(response)) {
-          // Direct array response
-          usersList = response;
-        } else if (response && typeof response === 'object' && 'data' in response) {
-          const dataResponse = response as { data?: unknown };
-          if (Array.isArray(dataResponse.data)) {
-            // Wrapped in data property
-            usersList = dataResponse.data as User[];
-          }
-        }
-        // Always set users state with the processed list (empty array if no data)
-        // This ensures consistent state management regardless of API response format
+        const usersList = extractUsersList(response);
         setUsers(usersList);
         
-        // For V1 API without total count, fetch total separately with large pageSize
-        // or use a separate API call. For now, we'll request a large pageSize to get approximate total
-        if (usersList.length === rowsPerPage) {
-          // Likely there are more records, make a call without pagination to get total
-          try {
-            const totalResponse = await UserService.filterUsersV2(filter, {
-              ...searchParams,
-              pageNumber: 0,
-              pageSize: 10000 // Large number to get all records for count
-            });
-            
-            let totalList: User[] = [];
-            if (Array.isArray(totalResponse)) {
-              totalList = totalResponse;
-            } else if (totalResponse && typeof totalResponse === 'object' && 'data' in totalResponse) {
-              const dataResponse = totalResponse as { data?: unknown };
-              if (Array.isArray(dataResponse.data)) {
-                totalList = dataResponse.data as User[];
-              }
-            }
-            
-            setTotalUsers(totalList.length);
-          } catch (error) {
-            console.error('Failed to get total count:', error);
-            setTotalUsers(usersList.length);
-          }
-        } else {
-          // Current page has fewer records than pageSize, so this is likely the last/only page
-          setTotalUsers(page * rowsPerPage + usersList.length);
-        }
+        const total = await fetchTotalCount(filter, searchParams, rowsPerPage, page, usersList.length);
+        setTotalUsers(total);
         
         console.log('Users loaded:', usersList.length);
       } catch (apiError) {
@@ -190,7 +179,6 @@ const UserManagement: React.FC = () => {
           message: `Failed to load users: ${apiError instanceof Error ? apiError.message : 'Unknown error'}`, 
           severity: 'error' 
         });
-        // Don't fall back to mock data, let user know there's an issue
         setUsers([]);
         setTotalUsers(0);
       }
@@ -204,7 +192,6 @@ const UserManagement: React.FC = () => {
       setUsers([]);
       setTotalUsers(0);
     } finally {
-      // Ensure minimum loading time for better UX
       const elapsedTime = Date.now() - startTime;
       const remainingTime = Math.max(0, minLoadingTime - elapsedTime);
       
