@@ -21,9 +21,9 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "type-check": "tsc --noEmit",
     "prelicense:check": "node scripts/download-dash-licenses.js",
-    "license:check": "dash-licenses-wrapper --inputFile=package-lock.json --summary=DEPENDENCIES",
+    "license:check": "dash-licenses-wrapper --inputFile=package-lock.json --summary=DEPENDENCIES --exclusions=\"node_modules/uidam-web-admin-portal\"",
     "prelicense:check:review": "node scripts/download-dash-licenses.js",
-    "license:check:review": "dash-licenses-wrapper --inputFile=package-lock.json --review --project=automotive.ecsp --summary=DEPENDENCIES"
+    "license:check:review": "dash-licenses-wrapper --inputFile=package-lock.json --review --project=automotive.ecsp --summary=DEPENDENCIES --timeout=500 --exclusions=\"node_modules/uidam-web-admin-portal\""
   },
   "dependencies": {
     "@emotion/react": "^11.11.1",
@@ -46,6 +46,7 @@
     "react-redux": "^9.0.4",
     "react-router-dom": "^6.30.3",
     "recharts": "^2.8.0",
+    "uidam-web-admin-portal": "file:",
     "yup": "^1.4.0"
   },
   "devDependencies": {
@@ -53,6 +54,7 @@
     "@storybook/addon-essentials": "^7.6.3",
     "@storybook/react": "^7.6.3",
     "@storybook/react-vite": "^7.6.3",
+    "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.1.6",
     "@testing-library/react": "^14.1.2",
     "@testing-library/user-event": "^14.5.1",
