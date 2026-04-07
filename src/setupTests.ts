@@ -96,6 +96,7 @@ beforeAll(() => {
       typeof args[0] === 'string' &&
       (args[0].includes('Warning: ReactDOM.render') ||
        args[0].includes('Warning: useLayoutEffect') ||
+       args[0].includes('Warning: An update to') ||
        args[0].includes('Not implemented: HTMLFormElement.prototype.submit') ||
        args[0].includes('User filter API error:') ||
        args[0].includes('Password reset request failed:') ||
