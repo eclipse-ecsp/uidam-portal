@@ -21,13 +21,16 @@ import {
   deleteResource, 
   getResource, 
   listResources, 
-  buildQueryParams 
+  buildQueryParams,
+  fetchPaginatedFilteredResources
 } from './serviceHelpers';
 import { userManagementApi } from '@/services/api-client';
 import { handleApiError } from './apiErrorHandler';
+import { fetchWithTokenRefresh } from '@/services/apiUtils';
 
 // Mock dependencies
 jest.mock('@/services/api-client');
+jest.mock('@/services/apiUtils');
 jest.mock('./apiErrorHandler');
 
 describe('serviceHelpers', () => {
@@ -419,6 +422,159 @@ describe('serviceHelpers', () => {
         .rejects.toThrow('List failed');
       
       expect(handleApiError).toHaveBeenCalledWith(error);
+    });
+  });
+
+  describe('fetchPaginatedFilteredResources', () => {
+    const mockFetch = fetchWithTokenRefresh as jest.MockedFunction<typeof fetchWithTokenRefresh>;
+    const baseOptions = {
+      urlPath: 'https://api.example.com/v1/items/filter',
+      filterKey: 'items',
+      filterName: undefined as string | undefined,
+      params: { page: 0, size: 10 },
+      serviceLabel: 'Test Service',
+    };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('should return paginated results (partial page)', async () => {
+      const items = [{ id: '1' }, { id: '2' }];
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ results: items }),
+      } as Response);
+
+      const result = await fetchPaginatedFilteredResources({ ...baseOptions });
+
+      expect(result.content).toEqual(items);
+      expect(result.totalElements).toBe(2);
+      expect(result.totalPages).toBe(1);
+      expect(result.number).toBe(0);
+      expect(result.first).toBe(true);
+      expect(result.last).toBe(true);
+    });
+
+    it('should use filterName when provided', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ results: [] }),
+      } as Response);
+
+      await fetchPaginatedFilteredResources({ ...baseOptions, filterName: 'myItem' });
+
+      const body = JSON.parse((mockFetch.mock.calls[0][1]?.body as string));
+      expect(body.items).toEqual(['myItem']);
+    });
+
+    it('should use empty array when filterName is not provided', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ results: [] }),
+      } as Response);
+
+      await fetchPaginatedFilteredResources({ ...baseOptions, filterName: undefined });
+
+      const body = JSON.parse((mockFetch.mock.calls[0][1]?.body as string));
+      expect(body.items).toEqual([]);
+    });
+
+    it('should fetch total count when full page returned and use it', async () => {
+      const fullPage = Array.from({ length: 10 }, (_, i) => ({ id: String(i) }));
+      const allItems = Array.from({ length: 25 }, (_, i) => ({ id: String(i) }));
+
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ results: fullPage }),
+        } as Response)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ results: allItems }),
+        } as Response);
+
+      const result = await fetchPaginatedFilteredResources({ ...baseOptions });
+
+      expect(result.totalElements).toBe(25);
+      expect(result.totalPages).toBe(3);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('should estimate total when total count response is not ok', async () => {
+      const fullPage = Array.from({ length: 10 }, (_, i) => ({ id: String(i) }));
+
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ results: fullPage }),
+        } as Response)
+        .mockResolvedValueOnce({
+          ok: false,
+          json: async () => ({}),
+        } as Response);
+
+      const result = await fetchPaginatedFilteredResources({ ...baseOptions });
+
+      // Falls back to page * size + results.length
+      expect(result.totalElements).toBe(10);
+    });
+
+    it('should estimate total when total count fetch throws', async () => {
+      const fullPage = Array.from({ length: 10 }, (_, i) => ({ id: String(i) }));
+
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ results: fullPage }),
+        } as Response)
+        .mockRejectedValueOnce(new Error('network error'));
+
+      const result = await fetchPaginatedFilteredResources({ ...baseOptions });
+
+      expect(result.totalElements).toBe(10);
+    });
+
+    it('should throw when response is not ok', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        text: async () => 'Internal Server Error',
+      } as Response);
+
+      await expect(fetchPaginatedFilteredResources({ ...baseOptions }))
+        .rejects.toThrow('HTTP error! status: 500');
+    });
+
+    it('should rethrow Error instances on network failure', async () => {
+      mockFetch.mockRejectedValueOnce(new Error('timeout'));
+
+      await expect(fetchPaginatedFilteredResources({ ...baseOptions }))
+        .rejects.toThrow('timeout');
+    });
+
+    it('should wrap non-Error throws', async () => {
+      mockFetch.mockRejectedValueOnce('string error');
+
+      await expect(fetchPaginatedFilteredResources({ ...baseOptions }))
+        .rejects.toThrow('Failed to fetch items');
+    });
+
+    it('should handle page > 0 for last page calculation', async () => {
+      const items = [{ id: '1' }];
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ results: items }),
+      } as Response);
+
+      const result = await fetchPaginatedFilteredResources({
+        ...baseOptions,
+        params: { page: 2, size: 10 },
+      });
+
+      expect(result.number).toBe(2);
+      expect(result.first).toBe(false);
+      expect(result.totalElements).toBe(21); // page 2 * 10 + 1
     });
   });
 });
