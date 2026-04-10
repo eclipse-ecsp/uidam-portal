@@ -16,7 +16,7 @@
 * <p>SPDX-License-Identifier: Apache-2.0
 ********************************************************************************/
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
@@ -25,11 +25,19 @@ import { uiSlice } from '@store/slices/uiSlice';
 import { authSlice } from '@store/slices/authSlice';
 import { UserService } from '@services/userService';
 import { authService } from '@services/auth.service';
+import { SessionService } from '@services/sessionService';
 
 // Mock the UserService
 jest.mock('@services/userService', () => ({
   UserService: {
     getSelfUser: jest.fn(),
+  },
+}));
+
+// Mock SessionService so heartbeat and visibility-change checks don't hit the network
+jest.mock('@services/sessionService', () => ({
+  SessionService: {
+    getActiveSessions: jest.fn().mockResolvedValue({ sessions: [], totalCount: 0 }),
   },
 }));
 
@@ -498,6 +506,89 @@ describe('Layout', () => {
     const button = dashboardButton?.closest('[role="button"]');
     
     expect(button).toHaveClass('Mui-selected');
+  });
+
+  describe('Cross-Browser Session Invalidation', () => {
+    beforeEach(() => {
+      jest.mocked(SessionService.getActiveSessions).mockClear();
+    });
+
+    it('calls SessionService.getActiveSessions when document becomes visible', async () => {
+      jest.mocked(SessionService.getActiveSessions).mockResolvedValue({ sessions: [], totalCount: 0 });
+
+      renderWithProviders(
+        <Layout>
+          <div>Content</div>
+        </Layout>
+      );
+
+      // Simulate the user switching back to this tab/window
+      await act(async () => {
+        Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      expect(SessionService.getActiveSessions).toHaveBeenCalled();
+    });
+
+    it('does not call SessionService.getActiveSessions when document becomes hidden', async () => {
+      jest.mocked(SessionService.getActiveSessions).mockResolvedValue({ sessions: [], totalCount: 0 });
+
+      renderWithProviders(
+        <Layout>
+          <div>Content</div>
+        </Layout>
+      );
+
+      // Reset call count from any mount-time calls
+      jest.mocked(SessionService.getActiveSessions).mockClear();
+
+      // Simulate the tab being hidden (user switches away)
+      await act(async () => {
+        Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      expect(SessionService.getActiveSessions).not.toHaveBeenCalled();
+
+      // Restore for other tests
+      Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+    });
+
+    it('silently ignores errors from the visibility-based session check', async () => {
+      jest.mocked(SessionService.getActiveSessions).mockRejectedValueOnce(new Error('Network error'));
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      renderWithProviders(
+        <Layout>
+          <div>Content</div>
+        </Layout>
+      );
+
+      // Should not throw or crash the component
+      await act(async () => {
+        Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      expect(SessionService.getActiveSessions).toHaveBeenCalled();
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('removes the visibilitychange listener on unmount', () => {
+      const removeEventListenerSpy = jest.spyOn(document, 'removeEventListener');
+
+      const { unmount } = renderWithProviders(
+        <Layout>
+          <div>Content</div>
+        </Layout>
+      );
+
+      unmount();
+
+      expect(removeEventListenerSpy).toHaveBeenCalledWith('visibilitychange', expect.any(Function));
+      removeEventListenerSpy.mockRestore();
+    });
   });
 
   describe('Profile Management', () => {
