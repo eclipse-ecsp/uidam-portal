@@ -29,13 +29,41 @@ import {
   Login as LoginIcon,
 } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { RootState } from '@store/index';
 import { loginStart, loginFailure } from '@store/slices/authSlice';
 import { authService } from '@services/auth.service';
+import { OAUTH_CONFIG } from '@config/app.config';
 
 const Login: React.FC = () => {
   const dispatch = useDispatch();
-  const { isLoading, error } = useSelector((state: RootState) => state.auth);
+  const navigate = useNavigate();
+  const { isLoading, error, isAuthenticated } = useSelector((state: RootState) => state.auth);
+
+  // Redirect to dashboard immediately if the user is already authenticated
+  // (e.g. this tab was opened while another tab is already logged in)
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/uidam/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
+
+  // Cross-tab login sync: when another tab completes login and writes the
+  // access token to localStorage, the browser fires a 'storage' event on
+  // every OTHER tab. Redirect to dashboard so the user lands there directly.
+  useEffect(() => {
+    const handleStorageChange = (event: StorageEvent) => {
+      if (
+        event.storageArea === localStorage &&
+        event.key === OAUTH_CONFIG.TOKEN_STORAGE_KEY &&
+        event.newValue !== null
+      ) {
+        navigate('/uidam/dashboard', { replace: true });
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [navigate]);
 
   const handleLogin = async () => {
     dispatch(loginStart());

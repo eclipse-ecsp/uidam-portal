@@ -21,9 +21,9 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "type-check": "tsc --noEmit",
     "prelicense:check": "node scripts/download-dash-licenses.js",
-    "license:check": "dash-licenses-wrapper --inputFile=package-lock.json --summary=DEPENDENCIES --exclusions=\"node_modules/uidam-web-admin-portal\"",
+    "license:check": "dash-licenses-wrapper --inputFile=package-lock.json --summary=DEPENDENCIES",
     "prelicense:check:review": "node scripts/download-dash-licenses.js",
-    "license:check:review": "dash-licenses-wrapper --inputFile=package-lock.json --review --project=automotive.ecsp --summary=DEPENDENCIES --timeout=500 --exclusions=\"node_modules/uidam-web-admin-portal\""
+    "license:check:review": "dash-licenses-wrapper --inputFile=package-lock.json --review --project=automotive.ecsp --summary=DEPENDENCIES --timeout=500"
   },
   "dependencies": {
     "@emotion/react": "^11.11.1",
@@ -36,10 +36,10 @@
     "@reduxjs/toolkit": "^2.0.1",
     "@tanstack/react-query": "^5.14.2",
     "@tanstack/react-query-devtools": "^5.14.2",
-    "axios": "1.13.6",
+    "axios": "1.15.0",
     "clsx": "^2.0.0",
     "date-fns": "^3.0.6",
-    "lodash": "^4.17.21",
+    "lodash": "4.18.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.48.2",
@@ -90,7 +90,12 @@
     },
     "minimatch@9": "~9.0.7",
     "qs": ">=6.14.2",
-    "tar": ">=7.5.13"
+    "tar": ">=7.5.13",
+    "handlebars": ">=4.7.9",
+    "path-to-regexp": "0.1.13",
+    "defu": ">=6.1.5",
+    "picomatch": ">=4.0.4",
+    "rollup": ">=4.58.1"
   },
   "engines": {
     "node": ">=19.5.0",
