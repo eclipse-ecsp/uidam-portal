@@ -187,6 +187,27 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     return () => clearInterval(id);
   }, []);
 
+  // Visibility-based session check — fires immediately when this tab or window
+  // becomes visible again (e.g. user alt-tabs back, un-minimises, or switches
+  // browser windows). This is the primary mechanism for detecting cross-browser
+  // session invalidation: when the user logs in on Browser B the server revokes
+  // Browser A's token; the next time the user looks at Browser A the check fires
+  // and redirects to /login without waiting for the next 30-second heartbeat tick.
+  React.useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible') {
+        try {
+          await SessionService.getActiveSessions();
+        } catch {
+          // 401 → SessionService already cleared tokens and redirected.
+          // Other transient errors are intentionally swallowed here.
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
   // Fetch full user profile on mount to get firstName and lastName
   React.useEffect(() => {
     const fetchUserProfile = async () => {
