@@ -14,23 +14,64 @@ jobs:
     with:
       node-version: '19.5.0'
     secrets:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }} 
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   license-check:
-    uses: eclipse-ecsp/.github/.github/workflows/workflow-nodejs-licence-analysis.yml@nodejs
     needs: build-and-test
-    with:
-      node-version: '19.5.0'
-      java-version: '17'
-      create-review: false
-  
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '19.5.0'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run License Check
+        run: |
+          EXIT_CODE=0
+          for attempt in 1 2 3; do
+            echo "::group::License check attempt $attempt of 3"
+            npm run license:check
+            EXIT_CODE=$?
+            echo "::endgroup::"
+            if [ $EXIT_CODE -eq 0 ]; then
+              echo "License check passed."
+              break
+            elif [ $EXIT_CODE -eq 127 ]; then
+              echo "::warning::Attempt $attempt: ClearlyDefined service unavailable (exit 127 - inconclusive)."
+              if [ $attempt -lt 3 ]; then
+                echo "Waiting 60s before retry..."
+                sleep 60
+              fi
+            else
+              echo "::error::License check failed (exit $EXIT_CODE). Release blocked."
+              exit $EXIT_CODE
+            fi
+          done
+          # For release: fail hard if still inconclusive after 3 retries.
+          if [ $EXIT_CODE -eq 127 ]; then
+            echo "::error::License check inconclusive after 3 retries. Re-run the release workflow when ClearlyDefined recovers."
+            exit 127
+          fi
+          exit $EXIT_CODE
+
   extract-version:
     needs: license-check
     uses: eclipse-ecsp/.github/.github/workflows/workflow-nodejs-extract-version.yml@nodejs
     with:
       node-version: '19.5.0'
-  
-      
+
   docker-push:
     needs: [build-and-test, license-check, extract-version]
     uses: eclipse-ecsp/.github/.github/workflows/workflow-nodejs-docker-push.yml@nodejs
