@@ -14,23 +14,24 @@ jobs:
     with:
       node-version: '19.5.0'
     secrets:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }} 
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   license-check:
-    uses: eclipse-ecsp/.github/.github/workflows/workflow-nodejs-licence-analysis.yml@nodejs
     needs: build-and-test
+    uses: eclipse-ecsp/.github/.github/workflows/workflow-nodejs-licence-analysis.yml@nodejs
     with:
       node-version: '19.5.0'
       java-version: '17'
       create-review: false
-  
+    secrets:
+      token: ${{ secrets.GITLAB_API_TOKEN }}
+
   extract-version:
     needs: license-check
     uses: eclipse-ecsp/.github/.github/workflows/workflow-nodejs-extract-version.yml@nodejs
     with:
       node-version: '19.5.0'
-  
-      
+
   docker-push:
     needs: [build-and-test, license-check, extract-version]
     uses: eclipse-ecsp/.github/.github/workflows/workflow-nodejs-docker-push.yml@nodejs
