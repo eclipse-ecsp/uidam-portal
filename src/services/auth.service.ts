@@ -97,6 +97,7 @@ export class AuthService {
       const baseUrl = `${API_CONFIG.AUTH_SERVER_URL}${API_CONFIG.SESSION_API_PREFIX}/oauth2/authorize`;
       const scopeValue = OAUTH_CONFIG.SCOPES.join(' ');
       
+      // Always include scope= parameter; empty string means server grants default scopes
       let authUrl = `${baseUrl}?response_type=code&client_id=${OAUTH_CONFIG.CLIENT_ID}&redirect_uri=${encodeURIComponent(OAUTH_CONFIG.REDIRECT_URI)}&scope=${encodeURIComponent(scopeValue)}&state=${state}`;
       
       // Add PKCE parameters if enabled
@@ -212,7 +213,7 @@ export class AuthService {
           refreshToken: tokenResponse.refresh_token,
           expiresIn: tokenResponse.expires_in,
           tokenType: tokenResponse.token_type,
-          scope: tokenResponse.scope || OAUTH_CONFIG.SCOPES.join(' '),
+          scope: tokenResponse.scope || '',
         },
       };
     } catch (error) {
@@ -502,7 +503,7 @@ export class AuthService {
     localStorage.setItem(OAUTH_CONFIG.REFRESH_TOKEN_STORAGE_KEY, tokens.refresh_token);
     
     // Store scopes from token response
-    const scopes = tokens.scope || OAUTH_CONFIG.SCOPES.join(' ');
+    const scopes = tokens.scope || '';
     localStorage.setItem('uidam_token_scopes', scopes);
     
     // Store expiration time
