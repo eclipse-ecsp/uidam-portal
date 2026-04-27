@@ -31,6 +31,7 @@ describe('app.config', () => {
     REACT_APP_OAUTH_CLIENT_SECRET: 'secret-123',
     REACT_APP_OAUTH_REDIRECT_URI: 'https://app.example.com/callback',
     REACT_APP_OAUTH_USE_PKCE: true,
+    REACT_APP_OAUTH_SCOPES: 'SelfManage ViewUsers ManageUsers ManageUserRolesAndPermissions ManageAccounts ViewAccounts',
     REACT_APP_TOKEN_STORAGE_KEY: 'uidam_admin_token',
     REACT_APP_REFRESH_TOKEN_STORAGE_KEY: 'uidam_admin_refresh_token'
   };
@@ -179,13 +180,21 @@ describe('app.config', () => {
       expect(OAUTH_CONFIG.USE_PKCE).toBe(false);
     });
 
-    it('should have required scopes', () => {
+    it('should have required scopes from config', () => {
       expect(OAUTH_CONFIG.SCOPES).toContain('SelfManage');
       expect(OAUTH_CONFIG.SCOPES).toContain('ViewUsers');
       expect(OAUTH_CONFIG.SCOPES).toContain('ManageUsers');
       expect(OAUTH_CONFIG.SCOPES).toContain('ManageUserRolesAndPermissions');
       expect(OAUTH_CONFIG.SCOPES).toContain('ManageAccounts');
       expect(OAUTH_CONFIG.SCOPES).toContain('ViewAccounts');
+    });
+
+    it('should return empty array when REACT_APP_OAUTH_SCOPES is empty', () => {
+      (runtimeConfig.getConfig as jest.Mock).mockReturnValue({
+        ...mockConfig,
+        REACT_APP_OAUTH_SCOPES: ''
+      });
+      expect(OAUTH_CONFIG.SCOPES).toEqual([]);
     });
 
     it('should have token storage key', () => {
@@ -196,7 +205,7 @@ describe('app.config', () => {
       expect(OAUTH_CONFIG.REFRESH_TOKEN_STORAGE_KEY).toBe('uidam_admin_refresh_token');
     });
 
-    it('should have non-empty scopes array', () => {
+    it('should have non-empty scopes array when config is set', () => {
       expect(OAUTH_CONFIG.SCOPES.length).toBeGreaterThan(0);
     });
   });
