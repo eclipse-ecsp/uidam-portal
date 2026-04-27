@@ -160,6 +160,7 @@ const mockUsers: User[] = [
 describe('UserManagement', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    localStorage.setItem('uidam_token_scopes', 'SelfManage ViewUsers ManageUsers ManageUserRolesAndPermissions ManageAccounts ViewAccounts');
     (UserService.filterUsersV2 as jest.Mock).mockResolvedValue(mockUsers);
   });
 

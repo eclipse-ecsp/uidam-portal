@@ -72,14 +72,10 @@ export const OAUTH_CONFIG = {
   get USE_PKCE() {
     return getConfig().REACT_APP_OAUTH_USE_PKCE !== false;
   },
-  SCOPES: [
-    'SelfManage',
-    'ViewUsers',
-    'ManageUsers',
-    'ManageUserRolesAndPermissions',
-    'ManageAccounts',
-    'ViewAccounts'  
-  ],
+  get SCOPES() {
+    const raw = getConfig().REACT_APP_OAUTH_SCOPES || '';
+    return raw ? raw.split(' ').filter(Boolean) : [];
+  },
   get TOKEN_STORAGE_KEY() {
     return getConfig().REACT_APP_TOKEN_STORAGE_KEY;
   },

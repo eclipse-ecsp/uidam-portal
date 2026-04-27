@@ -1229,7 +1229,7 @@ describe('AuthService', () => {
       expect(parseInt(expiresAt!)).toBeGreaterThan(Date.now());
     });
 
-    it('should use default scopes if scope not in token response', () => {
+    it('should store empty scopes if scope not in token response', () => {
       const tokenResponse: TokenResponse = {
         access_token: 'access',
         refresh_token: 'refresh',
@@ -1240,7 +1240,7 @@ describe('AuthService', () => {
 
       (authService as any).storeTokens(tokenResponse);
 
-      expect(localStorage.getItem('uidam_token_scopes')).toBe('openid profile');
+      expect(localStorage.getItem('uidam_token_scopes')).toBe('');
     });
   });
 
