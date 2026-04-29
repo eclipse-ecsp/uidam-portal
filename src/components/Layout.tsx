@@ -72,8 +72,8 @@ const navigationItems = [
     text: 'Dashboard',
     icon: <DashboardIcon />,
     path: '/uidam/dashboard',
-    feature: true,
-    requiredScopes: [] as string[], // Always available
+    feature: false, // Disabled until dashboard backend is implemented; set to true to re-enable
+    requiredScopes: ['TenantAdmin'],
   },
   {
     text: 'User Management',
@@ -101,27 +101,27 @@ const navigationItems = [
     icon: <AdminPanelSettingsIcon />,
     path: '/uidam/scopes',
     feature: FEATURE_FLAGS.SCOPE_MANAGEMENT,
-    requiredScopes: [] as string[], // TODO: restrict once backend confirms scope
+    requiredScopes: ['ManageScopes'],
   },
   {
     text: 'Approval Workflow',
     icon: <ApprovalIcon />,
     path: '/uidam/approvals',
     feature: FEATURE_FLAGS.APPROVAL_WORKFLOW,
-    requiredScopes: [] as string[], // TODO: restrict once backend confirms scope
+    requiredScopes: ['ManageApprovals'],
   },
   {
     text: 'Client Management',
     icon: <AppsIcon />,
     path: '/uidam/clients',
     feature: FEATURE_FLAGS.CLIENT_MANAGEMENT,
-    requiredScopes: [] as string[], // TODO: restrict once backend confirms scope
+    requiredScopes: ['ManageClients'],
   },
   {
     text: 'Assistant',
     icon: <AdminPanelSettingsIcon />,
     path: '/uidam/assistant',
-    feature: true,
+    feature: false, // Removed from sidebar as per requirement; set to true to re-enable
     requiredScopes: [] as string[],
   },
 ].filter(item => item.feature);

@@ -1,424 +1,65 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="205" failures="0" errors="0" time="52.942">
-  <testsuite name="app.config" errors="0" failures="0" skipped="0" timestamp="2026-04-27T13:00:13" time="1.25" tests="40">
-    <testcase classname="app.config &gt; FEATURE_FLAGS" name="should have user management flag" time="0.014">
+<testsuites name="jest tests" tests="30" failures="0" errors="0" time="20.154">
+  <testsuite name="Layout" errors="0" failures="0" skipped="0" timestamp="2026-04-29T07:31:47" time="19.194" tests="30">
+    <testcase classname="Layout" name="should render children content" time="0.134">
     </testcase>
-    <testcase classname="app.config &gt; FEATURE_FLAGS" name="should have account management flag" time="0.001">
+    <testcase classname="Layout" name="should render app bar with logo and title" time="0.047">
     </testcase>
-    <testcase classname="app.config &gt; FEATURE_FLAGS" name="should have role management flag" time="0.001">
+    <testcase classname="Layout" name="should render navigation menu items" time="0.061">
     </testcase>
-    <testcase classname="app.config &gt; FEATURE_FLAGS" name="should have scope management flag" time="0.001">
+    <testcase classname="Layout" name="should display user avatar with first letter of firstName" time="0.037">
     </testcase>
-    <testcase classname="app.config &gt; FEATURE_FLAGS" name="should have approval workflow flag" time="0">
+    <testcase classname="Layout" name="should toggle sidebar when menu icon is clicked" time="0.053">
     </testcase>
-    <testcase classname="app.config &gt; FEATURE_FLAGS" name="should have client management flag" time="0">
+    <testcase classname="Layout" name="should open user menu when avatar is clicked" time="0.069">
     </testcase>
-    <testcase classname="app.config &gt; FEATURE_FLAGS" name="should have audit logs flag" time="0.001">
+    <testcase classname="Layout" name="should navigate when menu item is clicked" time="0.039">
     </testcase>
-    <testcase classname="app.config &gt; FEATURE_FLAGS" name="should have real time updates flag" time="0">
+    <testcase classname="Layout" name="should logout and navigate to login when logout is clicked" time="0.107">
     </testcase>
-    <testcase classname="app.config &gt; FEATURE_FLAGS" name="should have all features enabled by default" time="0.007">
+    <testcase classname="Layout" name="should call authService.logout when logout is triggered" time="0.103">
     </testcase>
-    <testcase classname="app.config &gt; API_CONFIG" name="should get auth server URL from runtime config" time="0.001">
+    <testcase classname="Layout" name="should handle logout failure gracefully" time="0.088">
     </testcase>
-    <testcase classname="app.config &gt; API_CONFIG" name="should get API base URL from runtime config" time="0.001">
+    <testcase classname="Layout" name="should clear Redux state after logout" time="0.09">
     </testcase>
-    <testcase classname="app.config &gt; API_CONFIG" name="should get API timeout from runtime config" time="0">
+    <testcase classname="Layout" name="should close user menu after logout" time="0.095">
     </testcase>
-    <testcase classname="app.config &gt; API_CONFIG" name="should get API retry attempts from runtime config" time="0">
+    <testcase classname="Layout" name="should close user menu when menu item is clicked" time="0.071">
     </testcase>
-    <testcase classname="app.config &gt; API_CONFIG" name="should get API retry delay from runtime config" time="0">
+    <testcase classname="Layout" name="should display correct page title based on route" time="0.031">
     </testcase>
-    <testcase classname="app.config &gt; API_CONFIG" name="should call getConfig function" time="0.001">
+    <testcase classname="Layout" name="should show theme toggle button" time="0.027">
     </testcase>
-    <testcase classname="app.config &gt; API_CONFIG" name="should return session API prefix from runtime config" time="0.001">
+    <testcase classname="Layout" name="should render sidebar when sidebarOpen is true" time="0.027">
     </testcase>
-    <testcase classname="app.config &gt; API_CONFIG" name="should default session API prefix to empty string when not configured" time="0">
+    <testcase classname="Layout" name="should handle user without firstName gracefully" time="0.033">
     </testcase>
-    <testcase classname="app.config &gt; API_CONFIG" name="should default API base URL to empty string when not configured" time="0">
+    <testcase classname="Layout" name="should handle user without firstName or userName" time="0.032">
     </testcase>
-    <testcase classname="app.config &gt; OAUTH_CONFIG" name="should get OAuth client ID from runtime config" time="0">
+    <testcase classname="Layout" name="should display user full name in menu" time="0.059">
     </testcase>
-    <testcase classname="app.config &gt; OAUTH_CONFIG" name="should get OAuth client secret from runtime config" time="0">
+    <testcase classname="Layout" name="should apply selected style to current route navigation item" time="0.034">
     </testcase>
-    <testcase classname="app.config &gt; OAUTH_CONFIG" name="should get OAuth redirect URI from runtime config" time="0">
+    <testcase classname="Layout &gt; Cross-Browser Session Invalidation" name="calls SessionService.getActiveSessions when document becomes visible" time="0.034">
     </testcase>
-    <testcase classname="app.config &gt; OAUTH_CONFIG" name="should get post logout redirect URI from runtime config when configured" time="0">
+    <testcase classname="Layout &gt; Cross-Browser Session Invalidation" name="does not call SessionService.getActiveSessions when document becomes hidden" time="0.035">
     </testcase>
-    <testcase classname="app.config &gt; OAUTH_CONFIG" name="should fall back to redirect URI for post logout when not configured" time="0.001">
+    <testcase classname="Layout &gt; Cross-Browser Session Invalidation" name="silently ignores errors from the visibility-based session check" time="0.044">
     </testcase>
-    <testcase classname="app.config &gt; OAUTH_CONFIG" name="should use PKCE when enabled in config" time="0">
+    <testcase classname="Layout &gt; Cross-Browser Session Invalidation" name="removes the visibilitychange listener on unmount" time="0.03">
     </testcase>
-    <testcase classname="app.config &gt; OAUTH_CONFIG" name="should default to true for PKCE when not specified" time="0.001">
+    <testcase classname="Layout &gt; Profile Management" name="should fetch user profile on mount if firstName or lastName is missing" time="0.045">
     </testcase>
-    <testcase classname="app.config &gt; OAUTH_CONFIG" name="should disable PKCE when explicitly set to false" time="0">
+    <testcase classname="Layout &gt; Profile Management" name="should always fetch profile on mount to get latest user info" time="0.044">
     </testcase>
-    <testcase classname="app.config &gt; OAUTH_CONFIG" name="should have required scopes from config" time="0.001">
+    <testcase classname="Layout &gt; Profile Management" name="should handle profile fetch error gracefully" time="0.099">
     </testcase>
-    <testcase classname="app.config &gt; OAUTH_CONFIG" name="should return empty array when REACT_APP_OAUTH_SCOPES is empty" time="0.001">
+    <testcase classname="Layout &gt; Profile Management" name="should update Redux store with fetched profile data" time="0.067">
     </testcase>
-    <testcase classname="app.config &gt; OAUTH_CONFIG" name="should have token storage key" time="0.001">
+    <testcase classname="Layout &gt; Profile Management" name="should display updated user name in avatar after profile fetch" time="0.049">
     </testcase>
-    <testcase classname="app.config &gt; OAUTH_CONFIG" name="should have refresh token storage key" time="0">
-    </testcase>
-    <testcase classname="app.config &gt; OAUTH_CONFIG" name="should have non-empty scopes array when config is set" time="0.001">
-    </testcase>
-    <testcase classname="app.config &gt; THEME_CONFIG" name="should have primary color defined" time="0">
-    </testcase>
-    <testcase classname="app.config &gt; THEME_CONFIG" name="should have secondary color defined" time="0.001">
-    </testcase>
-    <testcase classname="app.config &gt; THEME_CONFIG" name="should have light mode as default" time="0">
-    </testcase>
-    <testcase classname="app.config &gt; THEME_CONFIG" name="should have theme storage key" time="0">
-    </testcase>
-    <testcase classname="app.config &gt; THEME_CONFIG" name="should have valid hex colors" time="0.001">
-    </testcase>
-    <testcase classname="app.config &gt; Configuration consistency" name="should have all required API URLs" time="0.001">
-    </testcase>
-    <testcase classname="app.config &gt; Configuration consistency" name="should have all required OAuth settings" time="0">
-    </testcase>
-    <testcase classname="app.config &gt; Configuration consistency" name="should have valid timeout values" time="0.001">
-    </testcase>
-    <testcase classname="app.config &gt; Configuration consistency" name="should have positive retry attempts" time="0">
-    </testcase>
-  </testsuite>
-  <testsuite name="AuthService" errors="0" failures="0" skipped="0" timestamp="2026-04-27T13:00:13" time="1.336" tests="84">
-    <testcase classname="AuthService &gt; initiateLogin" name="should redirect to authorization URL with PKCE" time="0.023">
-    </testcase>
-    <testcase classname="AuthService &gt; initiateLogin" name="should store state in sessionStorage and localStorage" time="0.003">
-    </testcase>
-    <testcase classname="AuthService &gt; initiateLogin" name="should store PKCE code verifier in sessionStorage" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; initiateLogin" name="should store debug info in localStorage" time="0.002">
-    </testcase>
-    <testcase classname="AuthService &gt; handleAuthCallback" name="should successfully handle auth callback" time="0.003">
-    </testcase>
-    <testcase classname="AuthService &gt; handleAuthCallback" name="should throw error if state does not match" time="0.027">
-    </testcase>
-    <testcase classname="AuthService &gt; handleAuthCallback" name="should clear stored state after successful callback" time="0.003">
-    </testcase>
-    <testcase classname="AuthService &gt; handleAuthCallback" name="should store tokens in localStorage" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; handleAuthCallback" name="should handle token exchange failure" time="0.002">
-    </testcase>
-    <testcase classname="AuthService &gt; handleAuthCallback" name="should use fallback user profile if introspection fails" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; refreshToken" name="should refresh token successfully" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; refreshToken" name="should throw error if refresh fails" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; logout" name="should call OAuth2 logout endpoint with access token and clear storage" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; logout" name="should use custom post_logout_redirect_uri when provided" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; logout" name="should clear storage even if logout request fails" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; logout" name="should not call logout endpoint if no token exists" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; logout" name="should clear pkce_code_verifier from sessionStorage on logout" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; logout" name="should log logout details to console" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; logout" name="should handle logout with 302 redirect status" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; getUserProfile - additional edge cases" name="should use username fallback for email if email missing" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; getUserProfile - additional edge cases" name="should use sub for userId if username missing" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; getUserProfile - additional edge cases" name="should parse space-separated scopes from introspection" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; getUserProfile - additional edge cases" name="should use default accounts array if accounts missing" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; Token Management" name="should get stored token" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; Token Management" name="should get stored refresh token" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; Token Management" name="should get stored scopes" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; Token Management" name="should return default scopes if none stored" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; Token Management" name="should check if token is expired" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; Token Management" name="should return true if token expiration time has passed" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; Token Management" name="should return true if no expiration time stored" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; Token Management" name="should check if user is authenticated" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; Token Management" name="should return false if no token" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; Token Management" name="should return false if token is expired" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; Token Management" name="should clear all stored tokens" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; initiateLogin - without PKCE" name="should redirect to authorization URL without PKCE parameters" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; initiateLogin - without PKCE" name="should not store code verifier when PKCE is disabled" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; initiateLogin - without PKCE" name="should log legacy flow message when PKCE disabled" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; initiateLogin - error handling" name="should handle errors during code challenge generation" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; handleAuthCallback - state validation edge cases" name="should continue with warning when no state is stored" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; handleAuthCallback - state validation edge cases" name="should use localStorage state if sessionStorage is empty" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; handleAuthCallback - state validation edge cases" name="should log detailed debug info during state verification" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; handleAuthCallback - state validation edge cases" name="should remove pkce_code_verifier from sessionStorage after successful exchange" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; handleAuthCallback - state validation edge cases" name="should remove oauth_state_debug after successful callback" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; exchangeCodeForTokens - PKCE flow" name="should include code_verifier when PKCE is enabled and verifier exists" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; exchangeCodeForTokens - PKCE flow" name="should fallback to client_secret when code_verifier is missing" time="0.002">
-    </testcase>
-    <testcase classname="AuthService &gt; exchangeCodeForTokens - error responses" name="should handle token exchange with error JSON response" time="0.002">
-    </testcase>
-    <testcase classname="AuthService &gt; exchangeCodeForTokens - error responses" name="should handle token exchange with non-JSON error response" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; exchangeCodeForTokens - error responses" name="should handle token exchange with error object (no description)" time="0.002">
-    </testcase>
-    <testcase classname="AuthService &gt; exchangeCodeForTokens - error responses" name="should log detailed error information on token exchange failure" time="0.002">
-    </testcase>
-    <testcase classname="AuthService &gt; getUserProfile - comprehensive coverage" name="should handle introspection response with all fields" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; getUserProfile - comprehensive coverage" name="should handle inactive token in introspection response" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; getUserProfile - comprehensive coverage" name="should handle network errors during introspection" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; getUserProfile - comprehensive coverage" name="should use default values for missing optional fields" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; getUserProfile - comprehensive coverage" name="should use empty email when email missing from introspection and JWT" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; decodeJwtPayload" name="should decode a valid JWT payload" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; decodeJwtPayload" name="should return empty object for non-JWT string" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; decodeJwtPayload" name="should return empty object for malformed JWT payload" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; decodeJwtPayload" name="should use JWT claims as baseline when introspection returns partial data" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; decodeJwtPayload" name="should use JWT fallback when introspection fails" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; refreshToken - comprehensive coverage" name="should include client_secret in refresh request" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; refreshToken - comprehensive coverage" name="should store new tokens after refresh" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; refreshToken - comprehensive coverage" name="should handle refresh without client_secret" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; logout - comprehensive coverage" name="should include all required OAuth2 logout parameters" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; logout - comprehensive coverage" name="should generate unique state for each logout request" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; logout - comprehensive coverage" name="should clear all token-related items from storage" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; logout - comprehensive coverage" name="should use POST_LOGOUT_REDIRECT_URI from config" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; logout - comprehensive coverage" name="should construct correct logout URL with encoded access token" time="0.005">
-    </testcase>
-    <testcase classname="AuthService &gt; storeTokens - comprehensive coverage" name="should store token with scope and expiration" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; storeTokens - comprehensive coverage" name="should store empty scopes if scope not in token response" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; storeUserProfile" name="should store user profile as JSON" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; PKCE helper methods" name="should generate code verifier with correct format" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; PKCE helper methods" name="should generate code challenge from verifier" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; PKCE helper methods" name="should base64 URL encode correctly" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; Edge cases and error scenarios" name="should handle very long token expiration time" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; Edge cases and error scenarios" name="should handle token expiration at exact boundary" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; Edge cases and error scenarios" name="should handle invalid expiration time string" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; Edge cases and error scenarios" name="should handle empty token storage" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; Edge cases and error scenarios" name="should return default scopes when scopes string is empty" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; State management" name="should generate state with proper format" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; State management" name="should store state in both session and local storage" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; State management" name="should store debug info with timestamp and URL" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; Token exchange form data preparation" name="should prepare form data with all required fields" time="0.001">
-    </testcase>
-    <testcase classname="AuthService &gt; Token exchange form data preparation" name="should handle PKCE disabled" time="0">
-    </testcase>
-    <testcase classname="AuthService &gt; Token exchange form data preparation" name="should handle missing code verifier with warning" time="0">
-    </testcase>
-  </testsuite>
-  <testsuite name="AccountManagement" errors="0" failures="0" skipped="0" timestamp="2026-04-27T13:00:13" time="22.098" tests="10">
-    <testcase classname="AccountManagement" name="renders account management title" time="0.334">
-    </testcase>
-    <testcase classname="AccountManagement" name="displays subtitle" time="0.117">
-    </testcase>
-    <testcase classname="AccountManagement" name="displays accounts after loading" time="0.629">
-    </testcase>
-    <testcase classname="AccountManagement" name="displays account statuses with correct colors" time="0.618">
-    </testcase>
-    <testcase classname="AccountManagement" name="displays account roles" time="0.577">
-    </testcase>
-    <testcase classname="AccountManagement" name="shows &quot;No roles&quot; for accounts without roles" time="0.587">
-    </testcase>
-    <testcase classname="AccountManagement" name="displays account created by information" time="0.561">
-    </testcase>
-    <testcase classname="AccountManagement" name="displays create account button" time="0.184">
-    </testcase>
-    <testcase classname="AccountManagement" name="calls filterAccounts on mount" time="0.069">
-    </testcase>
-    <testcase classname="AccountManagement" name="displays loading state" time="0.086">
-    </testcase>
-  </testsuite>
-  <testsuite name="RoleManagement" errors="0" failures="0" skipped="0" timestamp="2026-04-27T13:00:13" time="25.335" tests="22">
-    <testcase classname="RoleManagement &gt; Initial Rendering" name="renders role management title and subtitle" time="0.254">
-    </testcase>
-    <testcase classname="RoleManagement &gt; Initial Rendering" name="shows loading state initially" time="0.137">
-    </testcase>
-    <testcase classname="RoleManagement &gt; Initial Rendering" name="loads and displays roles after loading" time="0.136">
-    </testcase>
-    <testcase classname="RoleManagement &gt; Initial Rendering" name="loads available scopes on mount" time="0.031">
-    </testcase>
-    <testcase classname="RoleManagement &gt; Search Functionality" name="allows searching for roles" time="0.514">
-    </testcase>
-    <testcase classname="RoleManagement &gt; Search Functionality" name="searches on Enter key press" time="0.227">
-    </testcase>
-    <testcase classname="RoleManagement &gt; Search Functionality" name="shows no results message when search returns empty" time="0.303">
-    </testcase>
-    <testcase classname="RoleManagement &gt; Create Role" name="opens create dialog when Create Role button is clicked" time="0.268">
-    </testcase>
-    <testcase classname="RoleManagement &gt; Create Role" name="validates required fields when creating role" time="0.328">
-    </testcase>
-    <testcase classname="RoleManagement &gt; Create Role" name="creates role successfully with valid data" time="0.829">
-    </testcase>
-    <testcase classname="RoleManagement &gt; Edit Role" name="opens edit dialog with role data" time="0.307">
-    </testcase>
-    <testcase classname="RoleManagement &gt; Edit Role" name="disables editing system roles" time="0.193">
-    </testcase>
-    <testcase classname="RoleManagement &gt; Edit Role" name="updates role successfully" time="0.979">
-    </testcase>
-    <testcase classname="RoleManagement &gt; Delete Role" name="opens delete confirmation dialog" time="0.268">
-    </testcase>
-    <testcase classname="RoleManagement &gt; Delete Role" name="disables deleting system roles" time="0.214">
-    </testcase>
-    <testcase classname="RoleManagement &gt; Delete Role" name="deletes role on confirmation" time="0.331">
-    </testcase>
-    <testcase classname="RoleManagement &gt; Delete Role" name="cancels delete operation" time="0.518">
-    </testcase>
-    <testcase classname="RoleManagement &gt; Error Handling" name="displays error when fetching roles fails" time="0.038">
-    </testcase>
-    <testcase classname="RoleManagement &gt; Error Handling" name="displays error when creating role fails" time="0.625">
-    </testcase>
-    <testcase classname="RoleManagement &gt; Scope Display" name="displays scopes with correct colors" time="0.089">
-    </testcase>
-    <testcase classname="RoleManagement &gt; Scope Display" name="shows &quot;+X more&quot; for roles with many scopes" time="0.088">
-    </testcase>
-    <testcase classname="RoleManagement &gt; Refresh Functionality" name="refreshes roles and clears search" time="0.357">
-    </testcase>
-  </testsuite>
-  <testsuite name="UserManagement" errors="0" failures="0" skipped="1" timestamp="2026-04-27T13:00:13" time="50.405" tests="49">
-    <testcase classname="UserManagement &gt; Initial Load" name="should render loading state initially" time="0.228">
-    </testcase>
-    <testcase classname="UserManagement &gt; Initial Load" name="should load and display users" time="0.622">
-    </testcase>
-    <testcase classname="UserManagement &gt; Initial Load" name="should show empty state when no users are available" time="0.575">
-    </testcase>
-    <testcase classname="UserManagement &gt; Initial Load" name="should handle load error" time="0.088">
-    </testcase>
-    <testcase classname="UserManagement &gt; Initial Load" name="should handle invalid response format" time="0.563">
-    </testcase>
-    <testcase classname="UserManagement &gt; Status Display" name="should display correct status chips for different user statuses" time="0.574">
-    </testcase>
-    <testcase classname="UserManagement &gt; Status Display" name="should return correct status colors" time="0.572">
-    </testcase>
-    <testcase classname="UserManagement &gt; Search Functionality" name="should filter users when searching" time="0.902">
-    </testcase>
-    <testcase classname="UserManagement &gt; Search Functionality" name="should handle search with whitespace" time="0.8">
-    </testcase>
-    <testcase classname="UserManagement &gt; Search Functionality" name="should not add userNames filter when search is empty" time="0">
-      <skipped/>
-    </testcase>
-    <testcase classname="UserManagement &gt; Search Functionality" name="should reset to first page when searching" time="0.698">
-    </testcase>
-    <testcase classname="UserManagement &gt; Status Filter Functionality" name="should display status filter dropdown" time="0.599">
-    </testcase>
-    <testcase classname="UserManagement &gt; Status Filter Functionality" name="should filter users by ACTIVE status" time="0.819">
-    </testcase>
-    <testcase classname="UserManagement &gt; Status Filter Functionality" name="should filter users by PENDING status" time="0.747">
-    </testcase>
-    <testcase classname="UserManagement &gt; Status Filter Functionality" name="should filter users by BLOCKED status" time="0.75">
-    </testcase>
-    <testcase classname="UserManagement &gt; Status Filter Functionality" name="should filter users by REJECTED status" time="0.716">
-    </testcase>
-    <testcase classname="UserManagement &gt; Status Filter Functionality" name="should filter users by DEACTIVATED status" time="0.715">
-    </testcase>
-    <testcase classname="UserManagement &gt; Status Filter Functionality" name="should clear status filter when selecting &quot;All Status&quot;" time="0.867">
-    </testcase>
-    <testcase classname="UserManagement &gt; Status Filter Functionality" name="should combine search term and status filter" time="0.866">
-    </testcase>
-    <testcase classname="UserManagement &gt; Status Filter Functionality" name="should reset to first page when changing status filter" time="0.746">
-    </testcase>
-    <testcase classname="UserManagement &gt; Pagination" name="should display default page size as 10" time="0.534">
-    </testcase>
-    <testcase classname="UserManagement &gt; Pagination" name="should handle page change" time="0.752">
-    </testcase>
-    <testcase classname="UserManagement &gt; Pagination" name="should handle rows per page change" time="0.73">
-    </testcase>
-    <testcase classname="UserManagement &gt; Pagination" name="should maintain filters when changing pages" time="1.001">
-    </testcase>
-    <testcase classname="UserManagement &gt; Pagination" name="should call API with correct search parameters" time="0.547">
-    </testcase>
-    <testcase classname="UserManagement &gt; User Actions" name="should open create user modal" time="0.654">
-    </testcase>
-    <testcase classname="UserManagement &gt; User Actions" name="should open actions menu when clicking more actions button" time="0.72">
-    </testcase>
-    <testcase classname="UserManagement &gt; User Actions" name="should open view details modal" time="0.814">
-    </testcase>
-    <testcase classname="UserManagement &gt; User Actions" name="should open view modal when clicking on table row" time="0.627">
-    </testcase>
-    <testcase classname="UserManagement &gt; User Actions" name="should open edit modal from menu" time="0.746">
-    </testcase>
-    <testcase classname="UserManagement &gt; User Actions" name="should open edit modal from details modal" time="0.736">
-    </testcase>
-    <testcase classname="UserManagement &gt; User Actions" name="should open manage accounts modal" time="0.77">
-    </testcase>
-    <testcase classname="UserManagement &gt; User Actions" name="should open delete dialog" time="0.823">
-    </testcase>
-    <testcase classname="UserManagement &gt; Modal Interactions" name="should reload users after creating a user" time="0.765">
-    </testcase>
-    <testcase classname="UserManagement &gt; Modal Interactions" name="should reload users after updating a user" time="0.905">
-    </testcase>
-    <testcase classname="UserManagement &gt; Modal Interactions" name="should reload users after deleting a user" time="0.835">
-    </testcase>
-    <testcase classname="UserManagement &gt; Modal Interactions" name="should reload users after managing accounts" time="0.843">
-    </testcase>
-    <testcase classname="UserManagement &gt; Modal Interactions" name="should close modals without reloading when cancelled" time="0.787">
-    </testcase>
-    <testcase classname="UserManagement &gt; Snackbar Messages" name="should auto-hide snackbar after 6 seconds" time="0.193">
-    </testcase>
-    <testcase classname="UserManagement &gt; Snackbar Messages" name="should close snackbar when clicking close button" time="0.99">
-    </testcase>
-    <testcase classname="UserManagement &gt; Account Display" name="should display user accounts with roles" time="0.554">
-    </testcase>
-    <testcase classname="UserManagement &gt; Account Display" name="should handle users with no accounts" time="0.546">
-    </testcase>
-    <testcase classname="UserManagement &gt; Error Handling" name="should clear error when dismiss button is clicked" time="0.532">
-    </testcase>
-    <testcase classname="UserManagement &gt; Admin Sessions" name="should open admin sessions modal when clicking Manage Active Sessions" time="0.767">
-    </testcase>
-    <testcase classname="UserManagement &gt; Admin Sessions" name="should close admin sessions modal" time="0.865">
-    </testcase>
-    <testcase classname="UserManagement &gt; Response Format Handling" name="should handle response wrapped in data property" time="0.535">
-    </testcase>
-    <testcase classname="UserManagement &gt; Response Format Handling" name="should fetch total count when page is exactly full (rowsPerPage=10)" time="0.032">
-    </testcase>
-    <testcase classname="UserManagement &gt; Response Format Handling" name="should handle total count fetch failure gracefully" time="0.544">
-    </testcase>
-    <testcase classname="UserManagement &gt; Response Format Handling" name="should handle total count response wrapped in data property" time="0.555">
+    <testcase classname="Layout &gt; Profile Management" name="should handle response without data property" time="0.052">
     </testcase>
   </testsuite>
 </testsuites>
