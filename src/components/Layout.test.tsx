@@ -82,7 +82,7 @@ const mockNavigate = jest.fn();
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
   useNavigate: () => mockNavigate,
-  useLocation: () => ({ pathname: '/uidam/dashboard' }),
+  useLocation: () => ({ pathname: '/uidam/users' }),
 }));
 
 const createMockStore = (initialState = {}) => {
@@ -165,14 +165,15 @@ describe('Layout', () => {
       </Layout>
     );
 
-    expect(screen.getAllByText('Dashboard')[0]).toBeInTheDocument();
     expect(screen.getAllByText('User Management')[0]).toBeInTheDocument();
     expect(screen.getAllByText('Account Management')[0]).toBeInTheDocument();
     expect(screen.getAllByText('Role Management')[0]).toBeInTheDocument();
     expect(screen.getAllByText('Scope Management')[0]).toBeInTheDocument();
     expect(screen.getAllByText('Approval Workflow')[0]).toBeInTheDocument();
     expect(screen.getAllByText('Client Management')[0]).toBeInTheDocument();
-    expect(screen.getAllByText('Assistant')[0]).toBeInTheDocument();
+    // Dashboard and Assistant are currently feature-flagged off (feature: false)
+    expect(screen.queryByRole('button', { name: /Dashboard/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Assistant/i })).not.toBeInTheDocument();
   });
 
   it('should display user avatar with first letter of firstName', () => {
@@ -224,8 +225,10 @@ describe('Layout', () => {
       </Layout>
     );
 
+    // Find the nav button (not the page title which also shows 'User Management')
     const userManagementItems = screen.getAllByText('User Management');
-    fireEvent.click(userManagementItems[0]);
+    const navButton = userManagementItems.find(item => item.closest('[role="button"]'));
+    fireEvent.click(navButton!);
 
     expect(mockNavigate).toHaveBeenCalledWith('/uidam/users');
   });
@@ -383,10 +386,10 @@ describe('Layout', () => {
       </Layout>
     );
 
-    // The page title is displayed in the app bar as uppercase text
-    const dashboardTexts = screen.getAllByText('Dashboard');
+    // The page title is displayed in the app bar matching the current route (/uidam/users)
+    const userMgmtTexts = screen.getAllByText('User Management');
     // Verify at least one instance exists (in the page title area)
-    expect(dashboardTexts.length).toBeGreaterThan(0);
+    expect(userMgmtTexts.length).toBeGreaterThan(0);
   });
 
   it('should show theme toggle button', () => {
@@ -500,11 +503,12 @@ describe('Layout', () => {
       </Layout>
     );
 
-    const dashboardItems = screen.getAllByText('Dashboard');
+    // Route is /uidam/users so User Management should be selected
+    const userMgmtItems = screen.getAllByText('User Management');
     // Find the one that's inside a ListItemButton (not the page title)
-    const dashboardButton = dashboardItems.find(item => item.closest('[role="button"]'));
-    const button = dashboardButton?.closest('[role="button"]');
-    
+    const userMgmtButton = userMgmtItems.find(item => item.closest('[role="button"]'));
+    const button = userMgmtButton?.closest('[role="button"]');
+
     expect(button).toHaveClass('Mui-selected');
   });
 
