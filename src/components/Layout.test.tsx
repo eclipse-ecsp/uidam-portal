@@ -67,12 +67,12 @@ jest.mock('@hooks/useTheme', () => ({
 // Mock useScopes so navigation items are all visible in tests
 jest.mock('@hooks/useScopes', () => ({
   useScopes: () => ({
-    scopes: ['ViewUsers', 'ManageUsers', 'ManageAccounts', 'ViewAccounts', 'SelfManage', 'ManageUserRolesAndPermissions'],
+    scopes: ['ViewUsers', 'ManageUsers', 'ManageAccounts', 'ViewAccounts', 'SelfManage', 'ManageUserRolesAndPermissions', 'ManageScopes', 'ManageApprovals', 'ManageClients'],
     hasScope: (scope: string) =>
-      ['ViewUsers', 'ManageUsers', 'ManageAccounts', 'ViewAccounts', 'SelfManage', 'ManageUserRolesAndPermissions'].includes(scope),
+      ['ViewUsers', 'ManageUsers', 'ManageAccounts', 'ViewAccounts', 'SelfManage', 'ManageUserRolesAndPermissions', 'ManageScopes', 'ManageApprovals', 'ManageClients'].includes(scope),
     hasAnyScope: (...required: string[]) =>
       required.some(s =>
-        ['ViewUsers', 'ManageUsers', 'ManageAccounts', 'ViewAccounts', 'SelfManage', 'ManageUserRolesAndPermissions'].includes(s)
+        ['ViewUsers', 'ManageUsers', 'ManageAccounts', 'ViewAccounts', 'SelfManage', 'ManageUserRolesAndPermissions', 'ManageScopes', 'ManageApprovals', 'ManageClients'].includes(s)
       ),
   }),
 }));
