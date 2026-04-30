@@ -16,13 +16,16 @@
 * <p>SPDX-License-Identifier: Apache-2.0
 ********************************************************************************/
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import Layout from './Layout';
 import { uiSlice } from '@store/slices/uiSlice';
 import { authSlice } from '@store/slices/authSlice';
+import { UserService } from '@services/userService';
+import { authService } from '@services/auth.service';
+import { SessionService } from '@services/sessionService';
 
 // Mock the UserService
 jest.mock('@services/userService', () => ({
@@ -31,10 +34,25 @@ jest.mock('@services/userService', () => ({
   },
 }));
 
+// Mock SessionService so heartbeat and visibility-change checks don't hit the network
+jest.mock('@services/sessionService', () => ({
+  SessionService: {
+    getActiveSessions: jest.fn().mockResolvedValue({ sessions: [], totalCount: 0 }),
+  },
+}));
+
 // Mock the authService
 jest.mock('@services/auth.service', () => ({
   authService: {
     logout: jest.fn(),
+    getStoredScopes: jest.fn().mockReturnValue([
+      'ViewUsers',
+      'ManageUsers',
+      'ManageAccounts',
+      'ViewAccounts',
+      'SelfManage',
+      'ManageUserRolesAndPermissions',
+    ]),
   },
 }));
 
@@ -46,12 +64,25 @@ jest.mock('@hooks/useTheme', () => ({
   }),
 }));
 
+// Mock useScopes so navigation items are all visible in tests
+jest.mock('@hooks/useScopes', () => ({
+  useScopes: () => ({
+    scopes: ['ViewUsers', 'ManageUsers', 'ManageAccounts', 'ViewAccounts', 'SelfManage', 'ManageUserRolesAndPermissions', 'ManageScopes', 'ManageApprovals', 'ManageClients'],
+    hasScope: (scope: string) =>
+      ['ViewUsers', 'ManageUsers', 'ManageAccounts', 'ViewAccounts', 'SelfManage', 'ManageUserRolesAndPermissions', 'ManageScopes', 'ManageApprovals', 'ManageClients'].includes(scope),
+    hasAnyScope: (...required: string[]) =>
+      required.some(s =>
+        ['ViewUsers', 'ManageUsers', 'ManageAccounts', 'ViewAccounts', 'SelfManage', 'ManageUserRolesAndPermissions', 'ManageScopes', 'ManageApprovals', 'ManageClients'].includes(s)
+      ),
+  }),
+}));
+
 // Mock useNavigate
 const mockNavigate = jest.fn();
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
   useNavigate: () => mockNavigate,
-  useLocation: () => ({ pathname: '/uidam/dashboard' }),
+  useLocation: () => ({ pathname: '/uidam/users' }),
 }));
 
 const createMockStore = (initialState = {}) => {
@@ -102,9 +133,6 @@ const renderWithProviders = (
 };
 
 describe('Layout', () => {
-  const { UserService } = require('@services/userService');
-  const { authService } = require('@services/auth.service');
-
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -137,14 +165,15 @@ describe('Layout', () => {
       </Layout>
     );
 
-    expect(screen.getAllByText('Dashboard')[0]).toBeInTheDocument();
     expect(screen.getAllByText('User Management')[0]).toBeInTheDocument();
     expect(screen.getAllByText('Account Management')[0]).toBeInTheDocument();
     expect(screen.getAllByText('Role Management')[0]).toBeInTheDocument();
     expect(screen.getAllByText('Scope Management')[0]).toBeInTheDocument();
     expect(screen.getAllByText('Approval Workflow')[0]).toBeInTheDocument();
     expect(screen.getAllByText('Client Management')[0]).toBeInTheDocument();
-    expect(screen.getAllByText('Assistant')[0]).toBeInTheDocument();
+    // Dashboard and Assistant are currently feature-flagged off (feature: false)
+    expect(screen.queryByRole('button', { name: /Dashboard/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Assistant/i })).not.toBeInTheDocument();
   });
 
   it('should display user avatar with first letter of firstName', () => {
@@ -196,14 +225,16 @@ describe('Layout', () => {
       </Layout>
     );
 
+    // Find the nav button (not the page title which also shows 'User Management')
     const userManagementItems = screen.getAllByText('User Management');
-    fireEvent.click(userManagementItems[0]);
+    const navButton = userManagementItems.find(item => item.closest('[role="button"]'));
+    fireEvent.click(navButton!);
 
     expect(mockNavigate).toHaveBeenCalledWith('/uidam/users');
   });
 
   it('should logout and navigate to login when logout is clicked', async () => {
-    authService.logout.mockResolvedValue(undefined);
+    jest.mocked(authService.logout).mockResolvedValue(undefined);
     
     const store = createMockStore();
     renderWithProviders(
@@ -230,7 +261,7 @@ describe('Layout', () => {
   });
 
   it('should call authService.logout when logout is triggered', async () => {
-    authService.logout.mockResolvedValue(undefined);
+    jest.mocked(authService.logout).mockResolvedValue(undefined);
 
     const store = createMockStore();
     renderWithProviders(
@@ -252,7 +283,7 @@ describe('Layout', () => {
   });
 
   it('should handle logout failure gracefully', async () => {
-    authService.logout.mockRejectedValue(new Error('Logout failed'));
+    jest.mocked(authService.logout).mockRejectedValue(new Error('Logout failed'));
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
     const store = createMockStore();
@@ -278,7 +309,7 @@ describe('Layout', () => {
   });
 
   it('should clear Redux state after logout', async () => {
-    authService.logout.mockResolvedValue(undefined);
+    jest.mocked(authService.logout).mockResolvedValue(undefined);
 
     const store = createMockStore();
     renderWithProviders(
@@ -302,7 +333,7 @@ describe('Layout', () => {
   });
 
   it('should close user menu after logout', async () => {
-    authService.logout.mockResolvedValue(undefined);
+    jest.mocked(authService.logout).mockResolvedValue(undefined);
 
     const store = createMockStore();
     renderWithProviders(
@@ -355,10 +386,10 @@ describe('Layout', () => {
       </Layout>
     );
 
-    // The page title is displayed in the app bar as uppercase text
-    const dashboardTexts = screen.getAllByText('Dashboard');
+    // The page title is displayed in the app bar matching the current route (/uidam/users)
+    const userMgmtTexts = screen.getAllByText('User Management');
     // Verify at least one instance exists (in the page title area)
-    expect(dashboardTexts.length).toBeGreaterThan(0);
+    expect(userMgmtTexts.length).toBeGreaterThan(0);
   });
 
   it('should show theme toggle button', () => {
@@ -414,10 +445,10 @@ describe('Layout', () => {
       { store }
     );
 
-    // Should use first letter of userName
+    // Should use first letter of userName (uppercased)
     const avatarButton = screen.getByLabelText('account of current user');
     const avatar = avatarButton.querySelector('.MuiAvatar-root');
-    expect(avatar).toHaveTextContent('t');
+    expect(avatar).toHaveTextContent('T');
   });
 
   it('should handle user without firstName or userName', () => {
@@ -446,10 +477,10 @@ describe('Layout', () => {
       { store }
     );
 
-    // Should use default 'U'
+    // Should use first letter of email before '@' (uppercased) since no firstName or userName
     const avatarButton = screen.getByLabelText('account of current user');
     const avatar = avatarButton.querySelector('.MuiAvatar-root');
-    expect(avatar).toHaveTextContent('U');
+    expect(avatar).toHaveTextContent('T');
   });
 
   it('should display user full name in menu', () => {
@@ -472,17 +503,101 @@ describe('Layout', () => {
       </Layout>
     );
 
-    const dashboardItems = screen.getAllByText('Dashboard');
+    // Route is /uidam/users so User Management should be selected
+    const userMgmtItems = screen.getAllByText('User Management');
     // Find the one that's inside a ListItemButton (not the page title)
-    const dashboardButton = dashboardItems.find(item => item.closest('[role="button"]'));
-    const button = dashboardButton?.closest('[role="button"]');
-    
+    const userMgmtButton = userMgmtItems.find(item => item.closest('[role="button"]'));
+    const button = userMgmtButton?.closest('[role="button"]');
+
     expect(button).toHaveClass('Mui-selected');
+  });
+
+  describe('Cross-Browser Session Invalidation', () => {
+    beforeEach(() => {
+      jest.mocked(SessionService.getActiveSessions).mockClear();
+    });
+
+    it('calls SessionService.getActiveSessions when document becomes visible', async () => {
+      jest.mocked(SessionService.getActiveSessions).mockResolvedValue({ sessions: [], totalCount: 0 });
+
+      renderWithProviders(
+        <Layout>
+          <div>Content</div>
+        </Layout>
+      );
+
+      // Simulate the user switching back to this tab/window
+      await act(async () => {
+        Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      expect(SessionService.getActiveSessions).toHaveBeenCalled();
+    });
+
+    it('does not call SessionService.getActiveSessions when document becomes hidden', async () => {
+      jest.mocked(SessionService.getActiveSessions).mockResolvedValue({ sessions: [], totalCount: 0 });
+
+      renderWithProviders(
+        <Layout>
+          <div>Content</div>
+        </Layout>
+      );
+
+      // Reset call count from any mount-time calls
+      jest.mocked(SessionService.getActiveSessions).mockClear();
+
+      // Simulate the tab being hidden (user switches away)
+      await act(async () => {
+        Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      expect(SessionService.getActiveSessions).not.toHaveBeenCalled();
+
+      // Restore for other tests
+      Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+    });
+
+    it('silently ignores errors from the visibility-based session check', async () => {
+      jest.mocked(SessionService.getActiveSessions).mockRejectedValueOnce(new Error('Network error'));
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      renderWithProviders(
+        <Layout>
+          <div>Content</div>
+        </Layout>
+      );
+
+      // Should not throw or crash the component
+      await act(async () => {
+        Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      expect(SessionService.getActiveSessions).toHaveBeenCalled();
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('removes the visibilitychange listener on unmount', () => {
+      const removeEventListenerSpy = jest.spyOn(document, 'removeEventListener');
+
+      const { unmount } = renderWithProviders(
+        <Layout>
+          <div>Content</div>
+        </Layout>
+      );
+
+      unmount();
+
+      expect(removeEventListenerSpy).toHaveBeenCalledWith('visibilitychange', expect.any(Function));
+      removeEventListenerSpy.mockRestore();
+    });
   });
 
   describe('Profile Management', () => {
     beforeEach(() => {
-      UserService.getSelfUser.mockClear();
+      jest.mocked(UserService.getSelfUser).mockClear();
     });
 
     it('should fetch user profile on mount if firstName or lastName is missing', async () => {
@@ -503,7 +618,8 @@ describe('Layout', () => {
         lastName: 'Doe',
       };
 
-      UserService.getSelfUser.mockResolvedValue({ data: completeUser });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      jest.mocked(UserService.getSelfUser).mockResolvedValue({ data: completeUser } as any);
 
       const store = createMockStore({
         auth: {
@@ -527,7 +643,7 @@ describe('Layout', () => {
       });
     });
 
-    it('should not fetch profile if user already has firstName and lastName', () => {
+    it('should always fetch profile on mount to get latest user info', async () => {
       const completeUser = {
         id: '1',
         userName: 'testuser',
@@ -556,13 +672,16 @@ describe('Layout', () => {
         { store }
       );
 
-      expect(UserService.getSelfUser).not.toHaveBeenCalled();
+      // Profile is always fetched on mount to reflect the real logged-in user
+      await waitFor(() => {
+        expect(UserService.getSelfUser).toHaveBeenCalled();
+      });
     });
 
     it('should handle profile fetch error gracefully', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
-      UserService.getSelfUser.mockRejectedValue(new Error('Failed to fetch profile'));
+      jest.mocked(UserService.getSelfUser).mockRejectedValue(new Error('Failed to fetch profile'));
 
       const incompleteUser = {
         id: '1',
@@ -623,7 +742,8 @@ describe('Layout', () => {
         status: 'ACTIVE' as const,
       };
 
-      UserService.getSelfUser.mockResolvedValue({ data: completeUser });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      jest.mocked(UserService.getSelfUser).mockResolvedValue({ data: completeUser } as any);
 
       const store = createMockStore({
         auth: {
@@ -672,7 +792,8 @@ describe('Layout', () => {
         status: 'ACTIVE' as const,
       };
 
-      UserService.getSelfUser.mockResolvedValue({ data: completeUser });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      jest.mocked(UserService.getSelfUser).mockResolvedValue({ data: completeUser } as any);
 
       const store = createMockStore({
         auth: {
@@ -719,7 +840,8 @@ describe('Layout', () => {
         status: 'ACTIVE' as const,
       };
 
-      UserService.getSelfUser.mockResolvedValue(directUserResponse);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      jest.mocked(UserService.getSelfUser).mockResolvedValue(directUserResponse as any);
 
       const store = createMockStore({
         auth: {

@@ -118,6 +118,38 @@ const countries = [
   'Australia', 'Japan', 'India', 'Brazil', 'Mexico'
 ];
 
+type CreateUserErrorShape = {
+  message?: string;
+  response?: { data?: { message?: string; messages?: Array<{ key?: string }> } };
+};
+
+const parseCreateUserError = (error: unknown): string => {
+  const err = error as CreateUserErrorShape;
+  if (err.message?.includes('409') || err.message?.includes('field.is.unique')) {
+    return 'User already exists. Please use a different username or email.';
+  }
+  if (err.response?.data?.messages) {
+    const messages = err.response.data.messages;
+    if (messages.some((m: { key?: string }) => m.key === 'field.is.unique')) {
+      return 'User already exists. Please use a different username or email.';
+    }
+    return messages.map((m: { key?: string }) => m.key).join(', ');
+  }
+  if (err.response?.data?.message) {
+    return err.response.data.message;
+  }
+  return err.message ?? 'Failed to create user';
+};
+
+const renderSelectedRoleChips = (selected: string[], roles: Role[]) => (
+  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+    {selected.map((roleId) => {
+      const role = roles.find(r => r.id.toString() === roleId);
+      return <Chip key={roleId} label={role ? role.name : roleId} size="small" />;
+    })}
+  </Box>
+);
+
 export const CreateUserModal: React.FC<CreateUserModalProps> = ({
   open,
   onClose,
@@ -354,30 +386,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
       }
     } catch (error: unknown) {
       logger.error('Error creating user:', error);
-      
-      // Parse error message from various possible formats
-      const err = error as { message?: string; response?: { data?: { message?: string; messages?: Array<{ key?: string }> } } };
-      
-      let errorMessage = 'Failed to create user';
-      
-      // Check if it's a duplicate user error (409)
-      if (err.message?.includes('409') || err.message?.includes('field.is.unique')) {
-        errorMessage = 'User already exists. Please use a different username or email.';
-      } else if (err.response?.data?.messages) {
-        // Handle structured error messages
-        const messages = err.response.data.messages;
-        if (messages.some((m: { key?: string }) => m.key === 'field.is.unique')) {
-          errorMessage = 'User already exists. Please use a different username or email.';
-        } else {
-          errorMessage = messages.map((m: { key?: string }) => m.key).join(', ');
-        }
-      } else if (err.response?.data?.message) {
-        errorMessage = err.response.data.message;
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
-      
-      setApiError(errorMessage);
+      setApiError(parseCreateUserError(error));
     } finally {
       setLoading(false);
     }
@@ -656,20 +665,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
                               value={selection.roleIds}
                               onChange={(e) => handleRoleChange(index, e.target.value as string[])}
                               label="Roles"
-                              renderValue={(selected) => (
-                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                                  {selected.map((roleId) => {
-                                    const role = availableRoles.find(r => r.id.toString() === roleId);
-                                    return (
-                                      <Chip 
-                                        key={roleId} 
-                                        label={role ? role.name : roleId} 
-                                        size="small" 
-                                      />
-                                    );
-                                  })}
-                                </Box>
-                              )}
+                              renderValue={(selected) => renderSelectedRoleChips(selected, availableRoles)}
                             >
                               {loadingRoles ? (
                                 <MenuItem disabled>

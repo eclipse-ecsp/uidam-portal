@@ -94,9 +94,10 @@ export class AuthService {
       const state = this.generateState();
       
       // Construct URL with PKCE parameters if enabled
-      const baseUrl = `${API_CONFIG.AUTH_SERVER_URL}/oauth2/authorize`;
+      const baseUrl = `${API_CONFIG.AUTH_SERVER_URL}${API_CONFIG.SESSION_API_PREFIX}/oauth2/authorize`;
       const scopeValue = OAUTH_CONFIG.SCOPES.join(' ');
       
+      // Always include scope= parameter; empty string means server grants default scopes
       let authUrl = `${baseUrl}?response_type=code&client_id=${OAUTH_CONFIG.CLIENT_ID}&redirect_uri=${encodeURIComponent(OAUTH_CONFIG.REDIRECT_URI)}&scope=${encodeURIComponent(scopeValue)}&state=${state}`;
       
       // Add PKCE parameters if enabled
@@ -212,7 +213,7 @@ export class AuthService {
           refreshToken: tokenResponse.refresh_token,
           expiresIn: tokenResponse.expires_in,
           tokenType: tokenResponse.token_type,
-          scope: tokenResponse.scope || OAUTH_CONFIG.SCOPES.join(' '),
+          scope: tokenResponse.scope || '',
         },
       };
     } catch (error) {
@@ -267,7 +268,7 @@ export class AuthService {
    */
   private async exchangeCodeForTokens(code: string): Promise<TokenResponse> {
     const formData = this.prepareTokenExchangeFormData(code);
-    const tokenUrl = `${API_CONFIG.AUTH_SERVER_URL}/oauth2/token`;
+    const tokenUrl = `${API_CONFIG.AUTH_SERVER_URL}${API_CONFIG.SESSION_API_PREFIX}/oauth2/token`;
     
     console.log('Token exchange request:', {
       url: tokenUrl,
@@ -325,13 +326,37 @@ export class AuthService {
   }
 
   /**
-   * Get user profile information using token introspection
+   * Decode a JWT token payload without verification.
+   * @param {string} token - The JWT token to decode
+   * @returns {Record<string, unknown>} The decoded payload claims
+   */
+  private decodeJwtPayload(token: string): Record<string, unknown> {
+    try {
+      const parts = token.split('.');
+      if (parts.length === 3) {
+        const payload = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'));
+        return JSON.parse(payload);
+      }
+    } catch { /* ignore */ }
+    return {};
+  }
+
+  /**
+   * Get user profile information using token introspection.
    * @param {string} accessToken - The access token to introspect
    * @returns {Promise<AuthUser>} The user profile information
    */
   private async getUserProfile(accessToken: string): Promise<AuthUser> {
+    // Decode JWT first as a reliable baseline (no network call required)
+    const claims = this.decodeJwtPayload(accessToken);
+    const jwtId       = (claims.sub       || claims.user_id    || '') as string;
+    const jwtUsername = (claims.username  || claims.sub        || '') as string;
+    const jwtEmail    = (claims.email     || '') as string;
+    const jwtFirst    = (claims.given_name  || '') as string;
+    const jwtLast     = (claims.family_name || '') as string;
+
     try {
-      const response = await fetch('/oauth2/introspect', { // Use relative URL to go through Vite/nginx proxy
+      const response = await fetch(`/oauth2/introspect`, { // Use relative URL to go through Vite/nginx proxy
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -346,15 +371,15 @@ export class AuthService {
         const tokenInfo = await response.json();
         
         if (tokenInfo.active) {
-          // Extract user information from token introspection
+          const username = tokenInfo.username || tokenInfo.sub || jwtUsername || '';
           return {
-            id: tokenInfo.sub || tokenInfo.username || '1',
-            userName: tokenInfo.username || tokenInfo.sub || 'admin',
-            email: tokenInfo.email || `${tokenInfo.username || 'admin'}@example.com`,
-            firstName: tokenInfo.given_name || 'Admin',
-            lastName: tokenInfo.family_name || 'User', 
+            id: tokenInfo.sub || username || jwtId || '1',
+            userName: username,
+            email: tokenInfo.email || jwtEmail,
+            firstName: tokenInfo.given_name || jwtFirst || '',
+            lastName: tokenInfo.family_name || jwtLast || '',
             roles: tokenInfo.roles || ['ADMIN'],
-            scopes: tokenInfo.scope ? tokenInfo.scope.split(' ') : [...OAUTH_CONFIG.SCOPES],
+            scopes: tokenInfo.scope ? tokenInfo.scope.split(' ') : [],
             accounts: tokenInfo.accounts || ['default-account'],
           };
         }
@@ -363,15 +388,16 @@ export class AuthService {
       console.warn('Could not fetch user profile from introspection:', error);
     }
 
-    // Fallback to basic user info
+    // Fallback: use whatever we extracted directly from the JWT
+    const jwtScopes = (claims.scope as string) ? (claims.scope as string).split(' ') : [];
     return {
-      id: '1',
-      userName: 'admin',
-      email: 'admin@example.com',
-      firstName: 'Admin',
-      lastName: 'User',
+      id: jwtId || '1',
+      userName: jwtUsername,
+      email: jwtEmail,
+      firstName: jwtFirst,
+      lastName: jwtLast,
       roles: ['ADMIN'],
-      scopes: [...OAUTH_CONFIG.SCOPES],
+      scopes: jwtScopes,
       accounts: ['default-account'],
     };
   }
@@ -393,7 +419,7 @@ export class AuthService {
       formData.append('client_secret', OAUTH_CONFIG.CLIENT_SECRET);
     }
 
-    const response = await fetch('/oauth2/token', { // Use relative URL to go through Vite/nginx proxy
+    const response = await fetch(`${API_CONFIG.SESSION_API_PREFIX}/oauth2/token`, { // Use relative URL to go through Vite/nginx proxy
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -428,11 +454,13 @@ export class AuthService {
     
     if (accessToken) {
       try {
-        // Generate state for logout flow
-        const state = Math.random().toString(36).substring(2, 15);
+        // Generate cryptographically secure state for logout flow
+        const stateArray = new Uint8Array(16);
+        crypto.getRandomValues(stateArray);
+        const state = Array.from(stateArray, b => b.toString(16).padStart(2, '0')).join('');
         
         // Construct logout URL with access_token as query parameter
-        const logoutUrl = `${API_CONFIG.AUTH_SERVER_URL}/oauth2/logout?access_token=${encodeURIComponent(accessToken)}`;
+        const logoutUrl = `${API_CONFIG.AUTH_SERVER_URL}${API_CONFIG.SESSION_API_PREFIX}/oauth2/logout?access_token=${encodeURIComponent(accessToken)}`;
         
         // Prepare form data for logout request
         const formData = new URLSearchParams();
@@ -475,9 +503,13 @@ export class AuthService {
     localStorage.setItem(OAUTH_CONFIG.TOKEN_STORAGE_KEY, tokens.access_token);
     localStorage.setItem(OAUTH_CONFIG.REFRESH_TOKEN_STORAGE_KEY, tokens.refresh_token);
     
-    // Store scopes from token response
-    const scopes = tokens.scope || OAUTH_CONFIG.SCOPES.join(' ');
-    localStorage.setItem('uidam_token_scopes', scopes);
+    // Store scopes: prefer token endpoint response, fall back to JWT payload scope claim
+    let scopeValue = tokens.scope || '';
+    if (!scopeValue) {
+      const claims = this.decodeJwtPayload(tokens.access_token);
+      scopeValue = (claims.scope as string) || '';
+    }
+    localStorage.setItem('uidam_token_scopes', scopeValue);
     
     // Store expiration time
     const expirationTime = Date.now() + (tokens.expires_in * 1000);

@@ -31,6 +31,7 @@ describe('app.config', () => {
     REACT_APP_OAUTH_CLIENT_SECRET: 'secret-123',
     REACT_APP_OAUTH_REDIRECT_URI: 'https://app.example.com/callback',
     REACT_APP_OAUTH_USE_PKCE: true,
+    REACT_APP_OAUTH_SCOPES: 'SelfManage ViewUsers ManageUsers ManageUserRolesAndPermissions ManageAccounts ViewAccounts',
     REACT_APP_TOKEN_STORAGE_KEY: 'uidam_admin_token',
     REACT_APP_REFRESH_TOKEN_STORAGE_KEY: 'uidam_admin_refresh_token'
   };
@@ -104,6 +105,30 @@ describe('app.config', () => {
       API_CONFIG.AUTH_SERVER_URL;
       expect(runtimeConfig.getConfig).toHaveBeenCalled();
     });
+
+    it('should return session API prefix from runtime config', () => {
+      (runtimeConfig.getConfig as jest.Mock).mockReturnValue({
+        ...mockConfig,
+        REACT_APP_SESSION_API_PREFIX: '/sdp',
+      });
+      expect(API_CONFIG.SESSION_API_PREFIX).toBe('/sdp');
+    });
+
+    it('should default session API prefix to empty string when not configured', () => {
+      (runtimeConfig.getConfig as jest.Mock).mockReturnValue({
+        ...mockConfig,
+        REACT_APP_SESSION_API_PREFIX: undefined,
+      });
+      expect(API_CONFIG.SESSION_API_PREFIX).toBe('');
+    });
+
+    it('should default API base URL to empty string when not configured', () => {
+      (runtimeConfig.getConfig as jest.Mock).mockReturnValue({
+        ...mockConfig,
+        REACT_APP_UIDAM_USER_MANAGEMENT_URL: undefined,
+      });
+      expect(API_CONFIG.API_BASE_URL).toBe('');
+    });
   });
 
   describe('OAUTH_CONFIG', () => {
@@ -117,6 +142,22 @@ describe('app.config', () => {
 
     it('should get OAuth redirect URI from runtime config', () => {
       expect(OAUTH_CONFIG.REDIRECT_URI).toBe('https://app.example.com/callback');
+    });
+
+    it('should get post logout redirect URI from runtime config when configured', () => {
+      (runtimeConfig.getConfig as jest.Mock).mockReturnValue({
+        ...mockConfig,
+        REACT_APP_OAUTH_POST_LOGOUT_REDIRECT_URI: 'https://app.example.com/logout',
+      });
+      expect(OAUTH_CONFIG.POST_LOGOUT_REDIRECT_URI).toBe('https://app.example.com/logout');
+    });
+
+    it('should fall back to redirect URI for post logout when not configured', () => {
+      (runtimeConfig.getConfig as jest.Mock).mockReturnValue({
+        ...mockConfig,
+        REACT_APP_OAUTH_POST_LOGOUT_REDIRECT_URI: undefined,
+      });
+      expect(OAUTH_CONFIG.POST_LOGOUT_REDIRECT_URI).toBe('https://app.example.com/callback');
     });
 
     it('should use PKCE when enabled in config', () => {
@@ -139,13 +180,21 @@ describe('app.config', () => {
       expect(OAUTH_CONFIG.USE_PKCE).toBe(false);
     });
 
-    it('should have required scopes', () => {
+    it('should have required scopes from config', () => {
       expect(OAUTH_CONFIG.SCOPES).toContain('SelfManage');
       expect(OAUTH_CONFIG.SCOPES).toContain('ViewUsers');
       expect(OAUTH_CONFIG.SCOPES).toContain('ManageUsers');
       expect(OAUTH_CONFIG.SCOPES).toContain('ManageUserRolesAndPermissions');
       expect(OAUTH_CONFIG.SCOPES).toContain('ManageAccounts');
       expect(OAUTH_CONFIG.SCOPES).toContain('ViewAccounts');
+    });
+
+    it('should return empty array when REACT_APP_OAUTH_SCOPES is empty', () => {
+      (runtimeConfig.getConfig as jest.Mock).mockReturnValue({
+        ...mockConfig,
+        REACT_APP_OAUTH_SCOPES: ''
+      });
+      expect(OAUTH_CONFIG.SCOPES).toEqual([]);
     });
 
     it('should have token storage key', () => {
@@ -156,7 +205,7 @@ describe('app.config', () => {
       expect(OAUTH_CONFIG.REFRESH_TOKEN_STORAGE_KEY).toBe('uidam_admin_refresh_token');
     });
 
-    it('should have non-empty scopes array', () => {
+    it('should have non-empty scopes array when config is set', () => {
       expect(OAUTH_CONFIG.SCOPES.length).toBeGreaterThan(0);
     });
   });

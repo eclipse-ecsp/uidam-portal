@@ -35,14 +35,14 @@ export const API_CONFIG = {
   get AUTH_SERVER_URL() {
     return getConfig().REACT_APP_UIDAM_AUTH_SERVER_URL;
   },
+  // Tenant path prefix for OAuth2 endpoints (e.g. "/sdp" when multitenancy is enabled).
+  // Reuses REACT_APP_SESSION_API_PREFIX — same prefix used by the session service.
+  get SESSION_API_PREFIX() {
+    return getConfig().REACT_APP_SESSION_API_PREFIX || '';
+  },
   get API_BASE_URL() {
-    const base = getConfig().REACT_APP_UIDAM_USER_MANAGEMENT_URL || '';
-    // In dev (base is empty), Vite proxies /v1 and /v2 directly — no prefix needed.
-    // In production (base is a full URL), append SESSION_API_PREFIX so routes resolve
-    // correctly when the API gateway exposes paths under that prefix (e.g. /sdp/v1/...).
-    if (!base) return '';
-    const prefix = getConfig().REACT_APP_SESSION_API_PREFIX ?? '';
-    return `${base}${prefix}`;
+    // Use empty string for relative URLs (Vite proxy) when not configured
+    return getConfig().REACT_APP_UIDAM_USER_MANAGEMENT_URL || '';
   },
   get API_TIMEOUT() {
     return getConfig().REACT_APP_API_TIMEOUT;
@@ -72,14 +72,10 @@ export const OAUTH_CONFIG = {
   get USE_PKCE() {
     return getConfig().REACT_APP_OAUTH_USE_PKCE !== false;
   },
-  SCOPES: [
-    'SelfManage',
-    'ViewUsers',
-    'ManageUsers',
-    'ManageUserRolesAndPermissions',
-    'ManageAccounts',
-    'ViewAccounts'  
-  ],
+  get SCOPES() {
+    const raw = getConfig().REACT_APP_OAUTH_SCOPES || '';
+    return raw ? raw.split(' ').filter(Boolean) : [];
+  },
   get TOKEN_STORAGE_KEY() {
     return getConfig().REACT_APP_TOKEN_STORAGE_KEY;
   },
