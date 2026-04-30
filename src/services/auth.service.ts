@@ -379,7 +379,7 @@ export class AuthService {
             firstName: tokenInfo.given_name || jwtFirst || '',
             lastName: tokenInfo.family_name || jwtLast || '',
             roles: tokenInfo.roles || ['ADMIN'],
-            scopes: tokenInfo.scope ? tokenInfo.scope.split(' ') : [...OAUTH_CONFIG.SCOPES],
+            scopes: tokenInfo.scope ? tokenInfo.scope.split(' ') : [],
             accounts: tokenInfo.accounts || ['default-account'],
           };
         }
@@ -389,6 +389,7 @@ export class AuthService {
     }
 
     // Fallback: use whatever we extracted directly from the JWT
+    const jwtScopes = (claims.scope as string) ? (claims.scope as string).split(' ') : [];
     return {
       id: jwtId || '1',
       userName: jwtUsername,
@@ -396,7 +397,7 @@ export class AuthService {
       firstName: jwtFirst,
       lastName: jwtLast,
       roles: ['ADMIN'],
-      scopes: [...OAUTH_CONFIG.SCOPES],
+      scopes: jwtScopes,
       accounts: ['default-account'],
     };
   }
@@ -502,9 +503,13 @@ export class AuthService {
     localStorage.setItem(OAUTH_CONFIG.TOKEN_STORAGE_KEY, tokens.access_token);
     localStorage.setItem(OAUTH_CONFIG.REFRESH_TOKEN_STORAGE_KEY, tokens.refresh_token);
     
-    // Store scopes from token response
-    const scopes = tokens.scope || '';
-    localStorage.setItem('uidam_token_scopes', scopes);
+    // Store scopes: prefer token endpoint response, fall back to JWT payload scope claim
+    let scopeValue = tokens.scope || '';
+    if (!scopeValue) {
+      const claims = this.decodeJwtPayload(tokens.access_token);
+      scopeValue = (claims.scope as string) || '';
+    }
+    localStorage.setItem('uidam_token_scopes', scopeValue);
     
     // Store expiration time
     const expirationTime = Date.now() + (tokens.expires_in * 1000);
