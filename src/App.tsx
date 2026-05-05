@@ -28,6 +28,20 @@ import { useTheme } from '@hooks/useTheme';
 import { getTheme } from '@/theme';
 import Layout from '@components/Layout';
 import ProtectedRoute from '@components/ProtectedRoute';
+import { FEATURE_FLAGS } from '@config/app.config';
+import { useScopes } from '@hooks/useScopes';
+
+// All nav items with their feature flag and required scopes (mirrors Layout.tsx).
+// This is the single source of truth for which page to land on after login.
+const NAV_ITEMS = [
+  { path: '/uidam/dashboard', feature: FEATURE_FLAGS.DASHBOARD, requiredScopes: ['TenantAdmin'] },
+  { path: '/uidam/users',     feature: FEATURE_FLAGS.USER_MANAGEMENT,    requiredScopes: ['ViewUsers', 'ManageUsers'] },
+  { path: '/uidam/accounts',  feature: FEATURE_FLAGS.ACCOUNT_MANAGEMENT, requiredScopes: ['ViewAccounts', 'ManageAccounts'] },
+  { path: '/uidam/roles',     feature: FEATURE_FLAGS.ROLE_MANAGEMENT,    requiredScopes: ['ManageUserRolesAndPermissions'] },
+  { path: '/uidam/scopes',    feature: FEATURE_FLAGS.SCOPE_MANAGEMENT,   requiredScopes: ['ManageScopes'] },
+  { path: '/uidam/approvals', feature: FEATURE_FLAGS.APPROVAL_WORKFLOW,  requiredScopes: ['ManageApprovals'] },
+  { path: '/uidam/clients',   feature: FEATURE_FLAGS.CLIENT_MANAGEMENT,  requiredScopes: ['ManageClients'] },
+];
 
 // Feature components (lazy loaded)
 const Dashboard = React.lazy(() => import('@features/dashboard/Dashboard'));
@@ -43,6 +57,26 @@ const ActiveSessionsManagement = React.lazy(() => import('@features/session-mana
 const Login = React.lazy(() => import('@features/auth/Login'));
 const AuthCallback = React.lazy(() => import('@features/auth/AuthCallback'));
 const ChangePassword = React.lazy(() => import('@features/auth/ChangePassword'));
+
+// Redirects to the first nav item the user has access to.
+// Falls back to /login if the user has no matching scopes at all.
+const DefaultRedirect: React.FC = () => {
+  const { hasAnyScope } = useScopes();
+  const first = NAV_ITEMS.find(
+    item => item.feature && (item.requiredScopes.length === 0 || hasAnyScope(...item.requiredScopes))
+  );
+  return <Navigate to={first ? first.path : '/login'} replace />;
+};
+
+// Guard: renders Dashboard only when the feature is enabled AND the user has TenantAdmin scope.
+// Redirects to the first accessible page otherwise.
+const DashboardGuard: React.FC = () => {
+  const { hasScope } = useScopes();
+  if (!FEATURE_FLAGS.DASHBOARD || !hasScope('TenantAdmin')) {
+    return <DefaultRedirect />;
+  }
+  return <Dashboard />;
+};
 
 // Create a query client
 const queryClient = new QueryClient({
@@ -70,17 +104,17 @@ const AppContent: React.FC = () => {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
-            {/* Legacy redirect: bare /dashboard → /uidam/dashboard */}
-            <Route path="/dashboard" element={<Navigate to="/uidam/dashboard" replace />} />
+            {/* Legacy redirect: bare /dashboard → first accessible page */}
+            <Route path="/dashboard" element={<DefaultRedirect />} />
             <Route
               path="/uidam/*"
               element={
                 <ProtectedRoute>
                   <Layout>
                     <Routes>
-                      {/* /uidam (index) → /uidam/dashboard */}
-                      <Route index element={<Navigate to="/uidam/dashboard" replace />} />
-                      <Route path="dashboard" element={<Dashboard />} />
+                      {/* /uidam (index) → first page the user has access to */}
+                      <Route index element={<DefaultRedirect />} />
+                      <Route path="dashboard" element={<DashboardGuard />} />
                       <Route path="profile" element={<Profile />} />
                       <Route path="change-password" element={<ChangePassword />} />
                       <Route path="users/*" element={<UserManagement />} />
@@ -91,14 +125,14 @@ const AppContent: React.FC = () => {
                       <Route path="clients/*" element={<ClientManagement />} />
                       <Route path="assistant" element={<Assistant />} />
                       <Route path="sessions" element={<ActiveSessionsManagement />} />
-                      <Route path="*" element={<Navigate to="/uidam/dashboard" replace />} />
+                      <Route path="*" element={<DefaultRedirect />} />
                     </Routes>
                   </Layout>
                 </ProtectedRoute>
               }
             />
-            {/* Catch-all: redirect to /uidam/dashboard */}
-            <Route path="*" element={<Navigate to="/uidam/dashboard" replace />} />
+            {/* Catch-all: redirect to first accessible page */}
+            <Route path="*" element={<DefaultRedirect />} />
           </Routes>
         </React.Suspense>
       </Router>

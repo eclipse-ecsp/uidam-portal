@@ -73,8 +73,13 @@ describe('app.config', () => {
       expect(FEATURE_FLAGS.REAL_TIME_UPDATES).toBe(true);
     });
 
-    it('should have all features enabled by default', () => {
-      Object.values(FEATURE_FLAGS).forEach(flag => {
+    it('should have DASHBOARD disabled (pending backend implementation)', () => {
+      expect(FEATURE_FLAGS.DASHBOARD).toBe(false);
+    });
+
+    it('should have all non-dashboard features enabled by default', () => {
+      const { DASHBOARD: _dashboard, ...rest } = FEATURE_FLAGS;
+      Object.values(rest).forEach(flag => {
         expect(flag).toBe(true);
       });
     });
