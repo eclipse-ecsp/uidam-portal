@@ -20,6 +20,7 @@ import { getConfig } from './runtimeConfig';
 
 // Feature flags for modular architecture
 export const FEATURE_FLAGS = {
+  DASHBOARD: false,
   USER_MANAGEMENT: true,
   ACCOUNT_MANAGEMENT: true,
   ROLE_MANAGEMENT: true,

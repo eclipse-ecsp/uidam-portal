@@ -72,7 +72,7 @@ const navigationItems = [
     text: 'Dashboard',
     icon: <DashboardIcon />,
     path: '/uidam/dashboard',
-    feature: false, // Disabled until dashboard backend is implemented; set to true to re-enable
+    feature: FEATURE_FLAGS.DASHBOARD,
     requiredScopes: ['TenantAdmin'],
   },
   {
