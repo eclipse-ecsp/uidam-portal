@@ -18,6 +18,42 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Dashboard from './Dashboard';
+import { DashboardService } from '../../services/dashboardService';
+
+vi.mock('../../services/dashboardService', () => ({
+  DashboardService: {
+    getDashboardStats: vi.fn(),
+  },
+}));
+
+const mockDashboardStats = {
+  totalUsers: 100,
+  activeUsers: 80,
+  pendingUsers: 15,
+  blockedUsers: 5,
+  totalAccounts: 10,
+  activeAccounts: 8,
+  pendingAccounts: 2,
+  totalRoles: 5,
+  totalScopes: 20,
+  externalUsers: 10,
+  federatedUsers: 5,
+  userAccountMappings: 120,
+  userStatusDistribution: {
+    activePercentage: 80.0,
+    pendingPercentage: 15.0,
+    blockedPercentage: 5.0,
+  },
+  recentActivity: [
+    {
+      id: '1',
+      type: 'User Created',
+      description: 'New user test@example.com created',
+      user: 'Admin',
+      timestamp: new Date().toISOString(),
+    },
+  ],
+};
 
 const createWrapper = () => {
   const queryClient = new QueryClient({
@@ -37,6 +73,17 @@ const createWrapper = () => {
 };
 
 describe('Dashboard', () => {
+  beforeEach(() => {
+    vi.mocked(DashboardService.getDashboardStats).mockResolvedValue({
+      success: true,
+      data: mockDashboardStats,
+    });
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('renders dashboard component', () => {
     const { container } = render(<Dashboard />, { wrapper: createWrapper() });
     expect(container).toBeInTheDocument();
@@ -51,21 +98,40 @@ describe('Dashboard', () => {
     render(<Dashboard />, { wrapper: createWrapper() });
     await waitFor(() => {
       expect(screen.getByText('Dashboard')).toBeInTheDocument();
-    }, { timeout: 3000 });
+    });
   });
 
   it('displays stat cards after loading', async () => {
     render(<Dashboard />, { wrapper: createWrapper() });
     await waitFor(() => {
-      const statCards = screen.getAllByRole('heading', { level: 4 });
-      expect(statCards.length).toBeGreaterThan(0);
-    }, { timeout: 3000 });
+      expect(screen.getByText('100')).toBeInTheDocument(); // totalUsers
+      expect(screen.getByText('80')).toBeInTheDocument();  // activeUsers
+    });
   });
 
   it('renders grid layout', async () => {
     const { container } = render(<Dashboard />, { wrapper: createWrapper() });
     await waitFor(() => {
       expect(container.querySelector('[class*="MuiGrid-container"]')).toBeInTheDocument();
-    }, { timeout: 3000 });
+    });
+  });
+
+  it('displays error state when API fails', async () => {
+    vi.mocked(DashboardService.getDashboardStats).mockResolvedValue({
+      success: false,
+      error: 'Network error',
+    });
+
+    render(<Dashboard />, { wrapper: createWrapper() });
+    await waitFor(() => {
+      expect(screen.getByText('Network error')).toBeInTheDocument();
+    });
+  });
+
+  it('calls DashboardService.getDashboardStats on mount', async () => {
+    render(<Dashboard />, { wrapper: createWrapper() });
+    await waitFor(() => {
+      expect(DashboardService.getDashboardStats).toHaveBeenCalledTimes(1);
+    });
   });
 });
