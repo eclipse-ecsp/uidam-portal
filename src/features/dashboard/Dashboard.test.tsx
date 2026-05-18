@@ -20,9 +20,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Dashboard from './Dashboard';
 import { DashboardService } from '../../services/dashboardService';
 
-vi.mock('../../services/dashboardService', () => ({
+jest.mock('../../services/dashboardService', () => ({
   DashboardService: {
-    getDashboardStats: vi.fn(),
+    getDashboardStats: jest.fn(),
   },
 }));
 
@@ -74,14 +74,14 @@ const createWrapper = () => {
 
 describe('Dashboard', () => {
   beforeEach(() => {
-    vi.mocked(DashboardService.getDashboardStats).mockResolvedValue({
+    (DashboardService.getDashboardStats as jest.Mock).mockResolvedValue({
       success: true,
       data: mockDashboardStats,
     });
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
   });
 
   it('renders dashboard component', () => {
@@ -117,7 +117,7 @@ describe('Dashboard', () => {
   });
 
   it('displays error state when API fails', async () => {
-    vi.mocked(DashboardService.getDashboardStats).mockResolvedValue({
+    (DashboardService.getDashboardStats as jest.Mock).mockResolvedValue({
       success: false,
       error: 'Network error',
     });

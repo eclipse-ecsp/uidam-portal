@@ -197,17 +197,16 @@ describe('DashboardGuard', () => {
     window.history.pushState({}, '', '/');
   });
 
-  it('redirects away from /uidam/dashboard when DASHBOARD feature flag is false', async () => {
+  it('renders dashboard when DASHBOARD feature flag is true and user has TenantAdmin', async () => {
     window.history.pushState({}, '', '/uidam/dashboard');
-    // User has TenantAdmin but DASHBOARD flag is false — should still redirect
+    // User has TenantAdmin and DASHBOARD flag is true — should render dashboard
     scopesMock(
       (...s) => s.some(sc => ['ViewUsers', 'ManageUsers'].includes(sc)),
       (s) => s === 'TenantAdmin',
     );
     render(<App />);
     await waitFor(() => {
-      // DashboardGuard calls DefaultRedirect → first accessible page
-      expect(screen.getByText('User Management Component')).toBeInTheDocument();
+      expect(screen.getByText('Dashboard Component')).toBeInTheDocument();
     });
   });
 
