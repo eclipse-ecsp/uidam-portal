@@ -23,15 +23,6 @@ import { handleApiResponse, fetchWithTokenRefresh } from './apiUtils';
 import { logger } from '../utils/logger';
 
 /**
- * User status distribution percentages returned by the backend.
- */
-export interface UserStatusDistribution {
-  activePercentage: number;
-  pendingPercentage: number;
-  blockedPercentage: number;
-}
-
-/**
  * Recent activity item from user events.
  */
 export interface RecentActivityItem {
@@ -58,7 +49,6 @@ export interface DashboardStatsResponse {
   externalUsers: number;
   federatedUsers: number;
   userAccountMappings: number;
-  userStatusDistribution: UserStatusDistribution;
   recentActivity: RecentActivityItem[];
 }
 

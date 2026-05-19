@@ -39,11 +39,6 @@ const mockDashboardStats = {
   externalUsers: 10,
   federatedUsers: 5,
   userAccountMappings: 120,
-  userStatusDistribution: {
-    activePercentage: 80.0,
-    pendingPercentage: 15.0,
-    blockedPercentage: 5.0,
-  },
   recentActivity: [
     {
       id: '1',
@@ -398,10 +393,10 @@ describe('Dashboard', () => {
     });
   });
 
-  it('handles null userStatusDistribution gracefully', async () => {
+  it('handles zero totalUsers gracefully for percentage display', async () => {
     (DashboardService.getDashboardStats as jest.Mock).mockResolvedValue({
       success: true,
-      data: { ...mockDashboardStats, userStatusDistribution: null },
+      data: { ...mockDashboardStats, totalUsers: 0, activeUsers: 0, pendingUsers: 0, blockedUsers: 0 },
     });
     render(<Dashboard />, { wrapper: createWrapper() });
     await waitFor(() => {
@@ -425,7 +420,6 @@ describe('Dashboard', () => {
         externalUsers: undefined,
         federatedUsers: undefined,
         userAccountMappings: undefined,
-        userStatusDistribution: undefined,
         recentActivity: [],
       },
     });
