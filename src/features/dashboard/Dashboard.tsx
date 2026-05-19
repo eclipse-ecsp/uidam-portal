@@ -31,6 +31,7 @@ import {
   ListItemAvatar,
   Avatar,
   IconButton,
+  Alert,
 } from '@mui/material';
 import {
   People,
@@ -44,45 +45,25 @@ import {
   Link,
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
+import { DashboardService, DashboardStatsResponse } from '../../services/dashboardService';
 
-// Helper function to create activity items with consistent structure
-const createActivity = (
-  id: string,
-  type: string,
-  description: string,
-  user: string,
-  timestamp: string,
-  category: 'user' | 'account' | 'mapping' | 'federated'
-) => ({
-  id,
-  type,
-  description,
-  user,
-  timestamp,
-  category,
-});
-
-// Mock data for demonstration
-const mockStats = {
-  totalUsers: 1247,
-  activeUsers: 1089,
-  pendingUsers: 23,
-  blockedUsers: 12,
-  totalRoles: 15,
-  totalScopes: 45,
-  totalAccounts: 8,
-  activeAccounts: 7,
-  pendingAccounts: 1,
-  userAccountMappings: 1342,
-  externalUsers: 45,
-  federatedUsers: 23,
-  recentActivity: [
-    createActivity('1', 'User Created', 'New user john.doe@example.com created with account mapping', 'Admin', '2 minutes ago', 'user'),
-    createActivity('2', 'Account Created', 'New account "ProjectAlpha" created with 3 roles', 'Manager', '5 minutes ago', 'account'),
-    createActivity('3', 'User-Account Mapping', 'User jane.smith mapped to DevAccount with DEVELOPER role', 'Admin', '8 minutes ago', 'mapping'),
-    createActivity('4', 'User Approved', 'User registration approved for bob.wilson', 'Admin', '10 minutes ago', 'user'),
-    createActivity('5', 'Federated User', 'Federated user alice.cooper@google.com logged in', 'System', '12 minutes ago', 'federated'),
-  ],
+// Helper function to get relative time description from ISO timestamp
+const getRelativeTime = (timestamp: string): string => {
+  if (!timestamp) return '';
+  try {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMinutes = Math.floor(diffMs / 60000);
+    if (diffMinutes < 1) return 'Just now';
+    if (diffMinutes < 60) return `${diffMinutes} minutes ago`;
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) return `${diffHours} hours ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays} days ago`;
+  } catch {
+    return timestamp;
+  }
 };
 
 const StatCard: React.FC<{
@@ -145,12 +126,14 @@ const StatCard: React.FC<{
 );
 
 const Dashboard: React.FC = () => {
-  const { data: stats, isLoading, refetch } = useQuery({
+  const { data: stats, isLoading, isError, error, refetch } = useQuery<DashboardStatsResponse>({
     queryKey: ['dashboard-stats'],
     queryFn: async () => {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return mockStats;
+      const result = await DashboardService.getDashboardStats();
+      if (!result.success || !result.data) {
+        throw new Error(result.error || 'Failed to fetch dashboard statistics');
+      }
+      return result.data;
     },
   });
 
@@ -169,12 +152,29 @@ const Dashboard: React.FC = () => {
     );
   }
 
+  if (isError) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography variant="h4" gutterBottom>
+          Dashboard
+        </Typography>
+        <Alert severity="error" action={
+          <IconButton color="inherit" size="small" onClick={handleRefresh}>
+            <Refresh />
+          </IconButton>
+        }>
+          {error instanceof Error ? error.message : 'Failed to load dashboard data'}
+        </Alert>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ p: 3, maxWidth: '1200px', mx: 'auto' }}> {/* Center dashboard with max width */}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
         <Box>
           <Typography variant="h4" component="h1" sx={{ fontWeight: 600, color: 'primary.main', mb: 1 }}>
-            Dashboard  <Typography component="span" variant="body2" sx={{ fontWeight: 600 }}> (Static Data Summary)</Typography>
+            Dashboard
           </Typography>
           <Typography variant="body1" color="text.secondary">
             Welcome to UIDAM Admin Portal - Monitor your identity and access management system
@@ -201,7 +201,6 @@ const Dashboard: React.FC = () => {
             value={stats?.totalUsers ?? 0}
             icon={<People />}
             color="#00a6e3"  // UIDAM blue
-            trend={12}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={4} lg={3}>
@@ -210,7 +209,6 @@ const Dashboard: React.FC = () => {
             value={stats?.activeUsers ?? 0}
             icon={<People />}
             color="#2e7d32"  // Green for active
-            trend={8}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={4} lg={3}>
@@ -366,14 +364,14 @@ const Dashboard: React.FC = () => {
                 <Box flex={1} mr={1}>
                   <LinearProgress 
                     variant="determinate" 
-                    value={87} 
+                    value={stats?.userStatusDistribution?.activePercentage ?? 0} 
                     sx={{ height: 8, borderRadius: 4 }}
                   />
                 </Box>
-                <Typography variant="body2">87%</Typography>
+                <Typography variant="body2">{stats?.userStatusDistribution?.activePercentage?.toFixed(1) ?? 0}%</Typography>
               </Box>
               <Typography variant="caption" color="text.secondary">
-                Active users in the last 30 days
+                Percentage of active users
               </Typography>
             </Box>
           </Paper>
@@ -409,7 +407,7 @@ const Dashboard: React.FC = () => {
                   <Typography variant="body2">Active</Typography>
                 </Box>
                 <Typography variant="body2" fontWeight={600}>
-                  {(((stats?.activeUsers ?? 0) / (stats?.totalUsers ?? 1)) * 100).toFixed(1)}%
+                  {stats?.userStatusDistribution?.activePercentage?.toFixed(1) ?? '0.0'}%
                 </Typography>
               </Box>
               
@@ -427,7 +425,7 @@ const Dashboard: React.FC = () => {
                   <Typography variant="body2">Pending</Typography>
                 </Box>
                 <Typography variant="body2" fontWeight={600}>
-                  {(((stats?.pendingUsers ?? 0) / (stats?.totalUsers ?? 1)) * 100).toFixed(1)}%
+                  {stats?.userStatusDistribution?.pendingPercentage?.toFixed(1) ?? '0.0'}%
                 </Typography>
               </Box>
               
@@ -445,7 +443,7 @@ const Dashboard: React.FC = () => {
                   <Typography variant="body2">Blocked</Typography>
                 </Box>
                 <Typography variant="body2" fontWeight={600}>
-                  {(((stats?.blockedUsers ?? 0) / (stats?.totalUsers ?? 1)) * 100).toFixed(1)}%
+                  {stats?.userStatusDistribution?.blockedPercentage?.toFixed(1) ?? '0.0'}%
                 </Typography>
               </Box>
 
@@ -514,14 +512,12 @@ const Dashboard: React.FC = () => {
             </Box>
             <List sx={{ p: 0, maxHeight: 400, overflow: 'auto' }}>
               {stats?.recentActivity.map((activity, index) => {
-                const getActivityColor = (category: string) => {
-                  switch (category) {
-                    case 'user': return '#00a6e3';
-                    case 'account': return '#ff9800';
-                    case 'mapping': return '#7b1fa2';
-                    case 'federated': return '#1976d2';
-                    default: return '#00a6e3';
-                  }
+                const getActivityColor = (type: string) => {
+                  const lowerType = type.toLowerCase();
+                  if (lowerType.includes('account')) return '#ff9800';
+                  if (lowerType.includes('mapping') || lowerType.includes('associate')) return '#7b1fa2';
+                  if (lowerType.includes('federated')) return '#1976d2';
+                  return '#00a6e3';
                 };
 
                 return (
@@ -539,7 +535,7 @@ const Dashboard: React.FC = () => {
                     <ListItemAvatar>
                       <Avatar 
                         sx={{ 
-                          bgcolor: getActivityColor(activity.category), 
+                          bgcolor: getActivityColor(activity.type), 
                           width: 36, 
                           height: 36,
                           fontSize: '0.875rem',
@@ -561,7 +557,7 @@ const Dashboard: React.FC = () => {
                             By {activity.user}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
-                            {activity.timestamp}
+                            {getRelativeTime(activity.timestamp)}
                           </Typography>
                         </React.Fragment>
                       }
