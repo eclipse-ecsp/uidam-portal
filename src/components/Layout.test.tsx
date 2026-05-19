@@ -82,7 +82,8 @@ const mockNavigate = jest.fn();
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
   useNavigate: () => mockNavigate,
-  useLocation: () => ({ pathname: '/uidam/users' }),
+  useLocation: () => ({ pathname: '/uidam/sdp/users' }),
+  useParams: () => ({ tenantId: 'sdp' }),
 }));
 
 const createMockStore = (initialState = {}) => {
@@ -230,7 +231,7 @@ describe('Layout', () => {
     const navButton = userManagementItems.find(item => item.closest('[role="button"]'));
     fireEvent.click(navButton!);
 
-    expect(mockNavigate).toHaveBeenCalledWith('/uidam/users');
+    expect(mockNavigate).toHaveBeenCalledWith('/uidam/sdp/users');
   });
 
   it('should logout and navigate to login when logout is clicked', async () => {

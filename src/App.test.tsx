@@ -149,8 +149,13 @@ const scopesMock = (hasAnyFn: (...s: string[]) => boolean, hasFn = (_s: string) 
 // DefaultRedirect — picks the first nav item the current user can access
 // ---------------------------------------------------------------------------
 describe('DefaultRedirect', () => {
+  beforeEach(() => {
+    localStorage.setItem('uidam_tenant_id', 'sdp');
+  });
+
   afterEach(() => {
     mockUseScopes.mockReset();
+    localStorage.removeItem('uidam_tenant_id');
     window.history.pushState({}, '', '/');
   });
 
@@ -191,28 +196,32 @@ describe('DefaultRedirect', () => {
 // DashboardGuard — blocks access when feature flag is off, allows when on + TenantAdmin
 // ---------------------------------------------------------------------------
 describe('DashboardGuard', () => {
+  beforeEach(() => {
+    localStorage.setItem('uidam_tenant_id', 'sdp');
+  });
+
   afterEach(() => {
     mockUseScopes.mockReset();
     jest.resetModules();
+    localStorage.removeItem('uidam_tenant_id');
     window.history.pushState({}, '', '/');
   });
 
-  it('redirects away from /uidam/dashboard when DASHBOARD feature flag is false', async () => {
-    window.history.pushState({}, '', '/uidam/dashboard');
-    // User has TenantAdmin but DASHBOARD flag is false — should still redirect
+  it('renders dashboard when DASHBOARD feature flag is true and user has TenantAdmin', async () => {
+    window.history.pushState({}, '', '/uidam/sdp/dashboard');
+    // User has TenantAdmin and DASHBOARD flag is true — should render dashboard
     scopesMock(
       (...s) => s.some(sc => ['ViewUsers', 'ManageUsers'].includes(sc)),
       (s) => s === 'TenantAdmin',
     );
     render(<App />);
     await waitFor(() => {
-      // DashboardGuard calls DefaultRedirect → first accessible page
-      expect(screen.getByText('User Management Component')).toBeInTheDocument();
+      expect(screen.getByText('Dashboard Component')).toBeInTheDocument();
     });
   });
 
   it('redirects to /login from /uidam/dashboard when user has no scopes', async () => {
-    window.history.pushState({}, '', '/uidam/dashboard');
+    window.history.pushState({}, '', '/uidam/sdp/dashboard');
     scopesMock(() => false, () => false);
     render(<App />);
     await waitFor(() => {

@@ -375,11 +375,24 @@ export interface ModalState {
 export interface DashboardStats {
   totalUsers: number;
   activeUsers: number;
-  pendingApprovals: number;
+  pendingUsers: number;
+  blockedUsers: number;
+  totalAccounts: number;
+  activeAccounts: number;
+  pendingAccounts: number;
   totalRoles: number;
   totalScopes: number;
-  totalAccounts: number;
+  externalUsers: number;
+  federatedUsers: number;
+  userAccountMappings: number;
+  userStatusDistribution: UserStatusDistribution;
   recentActivity: ActivityItem[];
+}
+
+export interface UserStatusDistribution {
+  activePercentage: number;
+  pendingPercentage: number;
+  blockedPercentage: number;
 }
 
 export interface ActivityItem {
