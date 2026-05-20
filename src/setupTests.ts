@@ -102,7 +102,10 @@ beforeAll(() => {
        args[0].includes('Password reset request failed:') ||
        args[0].includes('Failed to decode JWT token:') ||
        args[0].includes('Failed to parse error response:') ||
-       args[0].includes('Failed to fetch user profile in Layout:'))
+       args[0].includes('Failed to fetch user profile in Layout:') ||
+       args[0].includes('Failed to fetch accounts:') ||
+       args[0].includes('Error loading roles:') ||
+       args[0].includes('Error initializing account data:'))
     ) {
       return;
     }
