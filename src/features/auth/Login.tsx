@@ -15,7 +15,7 @@
 *
 * <p>SPDX-License-Identifier: Apache-2.0
 ********************************************************************************/
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Box,
   Typography,
@@ -24,6 +24,7 @@ import {
   Card,
   CardContent,
   CircularProgress,
+  TextField,
 } from '@mui/material';
 import {
   Login as LoginIcon,
@@ -34,17 +35,24 @@ import { RootState } from '@store/index';
 import { loginStart, loginFailure } from '@store/slices/authSlice';
 import { authService } from '@services/auth.service';
 import { OAUTH_CONFIG } from '@config/app.config';
+import { setRuntimeConfigValue } from '@config/runtimeConfig';
+
+const TENANT_ID_STORAGE_KEY = 'uidam_tenant_id';
 
 const Login: React.FC = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { isLoading, error, isAuthenticated } = useSelector((state: RootState) => state.auth);
+  const [tenantId, setTenantId] = useState<string>(
+    localStorage.getItem(TENANT_ID_STORAGE_KEY) ?? ''
+  );
 
   // Redirect to dashboard immediately if the user is already authenticated
   // (e.g. this tab was opened while another tab is already logged in)
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/uidam/dashboard', { replace: true });
+      const stored = localStorage.getItem(TENANT_ID_STORAGE_KEY) ?? '';
+      navigate(stored ? `/uidam/${stored}/dashboard` : '/login', { replace: true });
     }
   }, [isAuthenticated, navigate]);
 
@@ -58,7 +66,8 @@ const Login: React.FC = () => {
         event.key === OAUTH_CONFIG.TOKEN_STORAGE_KEY &&
         event.newValue !== null
       ) {
-        navigate('/uidam/dashboard', { replace: true });
+        const stored = localStorage.getItem(TENANT_ID_STORAGE_KEY) ?? '';
+        navigate(stored ? `/uidam/${stored}/dashboard` : '/login', { replace: true });
       }
     };
     window.addEventListener('storage', handleStorageChange);
@@ -67,8 +76,15 @@ const Login: React.FC = () => {
 
   const handleLogin = async () => {
     dispatch(loginStart());
-    
+
     try {
+      const tid = tenantId.trim().toLowerCase();
+      // Validate tenant before committing to an OAuth redirect.
+      // If the auth server returns TENANT_RESOLUTION_FAILED, an error is thrown
+      // here and displayed on this page — the redirect never happens.
+      await authService.validateTenant(tid);
+      localStorage.setItem(TENANT_ID_STORAGE_KEY, tid);
+      setRuntimeConfigValue('REACT_APP_SESSION_API_PREFIX', `/${tid}`);
       // Redirect to OAuth2 authorization server
       await authService.initiateLogin();
     } catch (err) {
@@ -116,6 +132,16 @@ const Login: React.FC = () => {
             </Alert>
           )}
 
+          <TextField
+            fullWidth
+            label="Tenant ID"
+            placeholder="e.g. SDP, ECSP"
+            value={tenantId}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTenantId(e.target.value)}
+            sx={{ mb: 3 }}
+            inputProps={{ 'aria-label': 'Tenant ID' }}
+          />
+
           <Box textAlign="center">
             <Typography variant="body1" color="text.secondary" paragraph>
               Click the button below to sign in through the UIDAM Authorization Server.
@@ -126,7 +152,7 @@ const Login: React.FC = () => {
               variant="contained"
               size="large"
               onClick={handleLogin}
-              disabled={isLoading}
+              disabled={isLoading || !tenantId.trim()}
               startIcon={isLoading ? <CircularProgress size={20} /> : <LoginIcon />}
               sx={{ mt: 2, py: 1.5, px: 4 }}
             >

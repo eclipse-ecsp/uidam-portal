@@ -31,11 +31,13 @@ jest.mock('@config/runtimeConfig', () => ({
   })),
   loadRuntimeConfig: jest.fn(),
   loadConfig: jest.fn(),
+  setRuntimeConfigValue: jest.fn(),
 }));
 
 jest.mock('../../services/auth.service', () => ({
   authService: {
     initiateLogin: jest.fn(),
+    validateTenant: jest.fn(),
   },
 }));
 
@@ -46,6 +48,7 @@ jest.mock('react-router-dom', () => ({
 }));
 
 const mockInitiateLogin = authService.initiateLogin as jest.Mock;
+const mockValidateTenant = authService.validateTenant as jest.Mock;
 
 const createMockStore = (initialState = {}) => {
   return configureStore({
@@ -78,8 +81,15 @@ const renderLogin = (store: ReturnType<typeof createMockStore>) =>
 describe('Login', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Pre-seed tenant ID so the sign-in button is enabled and URLs are built correctly
+    localStorage.setItem('uidam_tenant_id', 'sdp');
+    mockValidateTenant.mockResolvedValue(undefined);
     // Clear URL params
     window.history.pushState({}, '', '/login');
+  });
+
+  afterEach(() => {
+    localStorage.removeItem('uidam_tenant_id');
   });
 
   describe('Rendering', () => {
@@ -279,7 +289,7 @@ describe('Login', () => {
       const store = createMockStore({ isAuthenticated: true });
       renderLogin(store);
 
-      expect(mockNavigate).toHaveBeenCalledWith('/uidam/dashboard', { replace: true });
+      expect(mockNavigate).toHaveBeenCalledWith('/uidam/sdp/dashboard', { replace: true });
     });
 
     it('does not redirect when not authenticated', () => {
@@ -303,7 +313,7 @@ describe('Login', () => {
         );
       });
 
-      expect(mockNavigate).toHaveBeenCalledWith('/uidam/dashboard', { replace: true });
+      expect(mockNavigate).toHaveBeenCalledWith('/uidam/sdp/dashboard', { replace: true });
     });
 
     it('does not redirect when another tab removes the token (logout event)', async () => {

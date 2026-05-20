@@ -33,14 +33,16 @@ import { useScopes } from '@hooks/useScopes';
 
 // All nav items with their feature flag and required scopes (mirrors Layout.tsx).
 // This is the single source of truth for which page to land on after login.
-const NAV_ITEMS = [
-  { path: '/uidam/dashboard', feature: FEATURE_FLAGS.DASHBOARD, requiredScopes: ['TenantAdmin'] },
-  { path: '/uidam/users',     feature: FEATURE_FLAGS.USER_MANAGEMENT,    requiredScopes: ['ViewUsers', 'ManageUsers'] },
-  { path: '/uidam/accounts',  feature: FEATURE_FLAGS.ACCOUNT_MANAGEMENT, requiredScopes: ['ViewAccounts', 'ManageAccounts'] },
-  { path: '/uidam/roles',     feature: FEATURE_FLAGS.ROLE_MANAGEMENT,    requiredScopes: ['ManageUserRolesAndPermissions'] },
-  { path: '/uidam/scopes',    feature: FEATURE_FLAGS.SCOPE_MANAGEMENT,   requiredScopes: ['ManageScopes'] },
-  { path: '/uidam/approvals', feature: FEATURE_FLAGS.APPROVAL_WORKFLOW,  requiredScopes: ['ManageApprovals'] },
-  { path: '/uidam/clients',   feature: FEATURE_FLAGS.CLIENT_MANAGEMENT,  requiredScopes: ['ManageClients'] },
+const TENANT_ID_STORAGE_KEY = 'uidam_tenant_id';
+
+const getNavItems = (tenantId: string) => [
+  { path: `/uidam/${tenantId}/dashboard`, feature: FEATURE_FLAGS.DASHBOARD, requiredScopes: ['TenantAdmin'] },
+  { path: `/uidam/${tenantId}/users`,     feature: FEATURE_FLAGS.USER_MANAGEMENT,    requiredScopes: ['ViewUsers', 'ManageUsers'] },
+  { path: `/uidam/${tenantId}/accounts`,  feature: FEATURE_FLAGS.ACCOUNT_MANAGEMENT, requiredScopes: ['ViewAccounts', 'ManageAccounts'] },
+  { path: `/uidam/${tenantId}/roles`,     feature: FEATURE_FLAGS.ROLE_MANAGEMENT,    requiredScopes: ['ManageUserRolesAndPermissions'] },
+  { path: `/uidam/${tenantId}/scopes`,    feature: FEATURE_FLAGS.SCOPE_MANAGEMENT,   requiredScopes: ['ManageScopes'] },
+  { path: `/uidam/${tenantId}/approvals`, feature: FEATURE_FLAGS.APPROVAL_WORKFLOW,  requiredScopes: ['ManageApprovals'] },
+  { path: `/uidam/${tenantId}/clients`,   feature: FEATURE_FLAGS.CLIENT_MANAGEMENT,  requiredScopes: ['ManageClients'] },
 ];
 
 // Feature components (lazy loaded)
@@ -59,10 +61,12 @@ const AuthCallback = React.lazy(() => import('@features/auth/AuthCallback'));
 const ChangePassword = React.lazy(() => import('@features/auth/ChangePassword'));
 
 // Redirects to the first nav item the user has access to.
-// Falls back to /login if the user has no matching scopes at all.
+// Falls back to /login if no tenant is stored or the user has no matching scopes.
 const DefaultRedirect: React.FC = () => {
   const { hasAnyScope } = useScopes();
-  const first = NAV_ITEMS.find(
+  const tenantId = localStorage.getItem(TENANT_ID_STORAGE_KEY) ?? '';
+  if (!tenantId) return <Navigate to="/login" replace />;
+  const first = getNavItems(tenantId).find(
     item => item.feature && (item.requiredScopes.length === 0 || hasAnyScope(...item.requiredScopes))
   );
   return <Navigate to={first ? first.path : '/login'} replace />;
@@ -107,7 +111,7 @@ const AppContent: React.FC = () => {
             {/* Legacy redirect: bare /dashboard → first accessible page */}
             <Route path="/dashboard" element={<DefaultRedirect />} />
             <Route
-              path="/uidam/*"
+              path="/uidam/:tenantId/*"
               element={
                 <ProtectedRoute>
                   <Layout>

@@ -84,6 +84,57 @@ export class AuthService {
   }
 
   /**
+   * Validate that a tenant ID is recognised by the authorization server.
+   * Makes a lightweight request to the auth server's authorize endpoint with
+   * redirect:manual so we can inspect the response without navigating away.
+   *
+   * - If the server responds with a 3xx redirect the tenant is valid.
+   * - If the server returns a JSON body containing TENANT_RESOLUTION_FAILED the
+   *   tenant is invalid and an Error is thrown with a user-readable message.
+   * - If the request fails (CORS, network) validation is skipped and the
+   *   caller falls through to the normal redirect (graceful degradation).
+   *
+   * @param {string} tenantId - The lowercase tenant identifier to validate
+   * @throws {Error} When the auth server explicitly rejects the tenant
+   */
+  async validateTenant(tenantId: string): Promise<void> {
+    const url = `${API_CONFIG.AUTH_SERVER_URL}/${tenantId}/oauth2/authorize`;
+    try {
+      const response = await fetch(url, { redirect: 'manual' });
+
+      // A redirect (opaque) means the tenant was resolved — auth server is
+      // sending the user to the tenant login page as expected.
+      if (response.type === 'opaqueredirect') {
+        return;
+      }
+
+      const text = await response.text();
+      let data: { messages?: Array<{ key: string; parameters?: string[] }> };
+      try {
+        data = JSON.parse(text);
+      } catch {
+        // Non-JSON body — cannot determine validity, proceed optimistically
+        return;
+      }
+
+      const failed = (data?.messages ?? []).find(
+        (m) => m.key === 'TENANT_RESOLUTION_FAILED'
+      );
+      if (failed) {
+        throw new Error(
+          `Tenant "${tenantId.toUpperCase()}" not found. Please enter a valid Tenant ID.`
+        );
+      }
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('not found')) {
+        throw err;
+      }
+      // Network / CORS error — skip pre-validation and proceed with redirect
+      console.warn('Tenant pre-validation unavailable (network/CORS):', err);
+    }
+  }
+
+  /**
    * Initialize OAuth2 Authorization Code Grant flow with PKCE
    * Redirects user to the authorization server
    * @returns {Promise<void>} Redirects to authorization server, does not return

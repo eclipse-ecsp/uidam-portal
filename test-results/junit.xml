@@ -1608,7 +1608,7 @@
     </testcase>
     <testcase classname="Theme Configuration &gt; lightTheme" name="should have primary UIDAM blue color" time="0.002">
     </testcase>
-    <testcase classname="Theme Configuration &gt; lightTheme" name="should have correct primary color variants" time="0.002">
+    <testcase classname="authSlice" name="should not initialize from localStorage if token is expired" time="0.002">
     </testcase>
     <testcase classname="Theme Configuration &gt; lightTheme" name="should have correct secondary colors" time="0.003">
     </testcase>
@@ -1618,11 +1618,11 @@
     </testcase>
     <testcase classname="Theme Configuration &gt; lightTheme" name="should have custom colors defined" time="0.003">
     </testcase>
-    <testcase classname="Theme Configuration &gt; lightTheme" name="should have gradient background" time="0.002">
+    <testcase classname="authSlice" name="should handle updateUser action" time="0.002">
     </testcase>
-    <testcase classname="Theme Configuration &gt; lightTheme" name="should have custom surface colors" time="0.001">
+    <testcase classname="authSlice" name="should handle clearError action" time="0.002">
     </testcase>
-    <testcase classname="Theme Configuration &gt; lightTheme" name="should have typography configuration" time="0.001">
+    <testcase classname="authSlice" name="should maintain authentication state through multiple actions" time="0.003">
     </testcase>
     <testcase classname="Theme Configuration &gt; lightTheme" name="should have heading typography styles" time="0.006">
     </testcase>
@@ -1634,15 +1634,15 @@
     </testcase>
     <testcase classname="Theme Configuration &gt; darkTheme" name="should be defined" time="0.001">
     </testcase>
-    <testcase classname="Theme Configuration &gt; darkTheme" name="should have dark mode palette" time="0.001">
+    <testcase classname="StyledTableComponents &gt; StyledTableCell" name="renders table cell correctly" time="0.008">
     </testcase>
-    <testcase classname="Theme Configuration &gt; darkTheme" name="should have primary color adjusted for dark mode" time="0.001">
+    <testcase classname="StyledTableComponents &gt; StyledTableCell" name="renders with text content" time="0.01">
     </testcase>
-    <testcase classname="Theme Configuration &gt; darkTheme" name="should have dark background colors" time="0.001">
+    <testcase classname="StyledTableComponents &gt; StyledTableCell" name="renders with numeric content" time="0.007">
     </testcase>
     <testcase classname="Theme Configuration &gt; darkTheme" name="should have dark text colors" time="0">
     </testcase>
-    <testcase classname="Theme Configuration &gt; darkTheme" name="should have custom colors for dark mode" time="0.001">
+    <testcase classname="StyledTableComponents &gt; StyledTableCell" name="supports empty cell" time="0.008">
     </testcase>
     <testcase classname="Theme Configuration &gt; darkTheme" name="should have dark gradient background" time="0.002">
     </testcase>
@@ -1654,11 +1654,11 @@
     </testcase>
     <testcase classname="Theme Configuration &gt; darkTheme" name="should have divider color for dark mode" time="0">
     </testcase>
-    <testcase classname="Theme Configuration &gt; getTheme function" name="should return lightTheme when mode is light" time="0.001">
+    <testcase classname="StyledTableComponents &gt; Integration Tests" name="renders complete table structure" time="0.019">
     </testcase>
     <testcase classname="Theme Configuration &gt; getTheme function" name="should return darkTheme when mode is dark" time="0">
     </testcase>
-    <testcase classname="Theme Configuration &gt; getTheme function" name="should handle light mode case" time="0.001">
+    <testcase classname="StyledTableComponents &gt; Integration Tests" name="renders styled components with theme" time="0.013">
     </testcase>
     <testcase classname="Theme Configuration &gt; getTheme function" name="should handle dark mode case" time="0.003">
     </testcase>
@@ -2217,15 +2217,15 @@
   <testsuite name="accountErrorUtils" errors="0" failures="0" skipped="0" timestamp="2026-05-18T10:16:15" time="0.411" tests="27">
     <testcase classname="accountErrorUtils &gt; getAccountErrorMessage &gt; Error instance handling" name="should return error message from Error instance" time="0.003">
     </testcase>
-    <testcase classname="accountErrorUtils &gt; getAccountErrorMessage &gt; Error instance handling" name="should return error message for different operation types" time="0.002">
+    <testcase classname="apiUtils &gt; handleApiResponse" name="should throw error for failed response with JSON error" time="0.056">
     </testcase>
-    <testcase classname="accountErrorUtils &gt; getAccountErrorMessage &gt; Status code handling - Create operation" name="should return 400 message for create with invalid data" time="0.001">
+    <testcase classname="apiUtils &gt; handleApiResponse" name="should throw error for failed response with error field" time="0.003">
     </testcase>
     <testcase classname="accountErrorUtils &gt; getAccountErrorMessage &gt; Status code handling - Create operation" name="should return 401 message for create unauthorized" time="0">
     </testcase>
-    <testcase classname="accountErrorUtils &gt; getAccountErrorMessage &gt; Status code handling - Create operation" name="should return 403 message for create forbidden" time="0.001">
+    <testcase classname="apiUtils &gt; handleApiResponse" name="should use text response when JSON parsing fails" time="0.002">
     </testcase>
-    <testcase classname="accountErrorUtils &gt; getAccountErrorMessage &gt; Status code handling - Create operation" name="should return 409 message for create conflict" time="0.001">
+    <testcase classname="apiUtils &gt; handleApiResponse" name="should use default error message when no error details available" time="0.007">
     </testcase>
     <testcase classname="accountErrorUtils &gt; getAccountErrorMessage &gt; Status code handling - Create operation" name="should return 500 message for create server error" time="0.001">
     </testcase>
@@ -2233,39 +2233,39 @@
     </testcase>
     <testcase classname="accountErrorUtils &gt; getAccountErrorMessage &gt; Status code handling - Update operation" name="should return 404 message for update not found" time="0">
     </testcase>
-    <testcase classname="accountErrorUtils &gt; getAccountErrorMessage &gt; Status code handling - Delete operation" name="should return 400 message for delete with invalid request" time="0.001">
+    <testcase classname="apiUtils &gt; getApiHeaders" name="should not include Authorization header when token is null" time="0.002">
     </testcase>
-    <testcase classname="accountErrorUtils &gt; getAccountErrorMessage &gt; Status code handling - Delete operation" name="should return 404 message for delete not found" time="0">
+    <testcase classname="apiUtils &gt; makeFetchRequest" name="should make successful request and return data" time="0.009">
     </testcase>
-    <testcase classname="accountErrorUtils &gt; getAccountErrorMessage &gt; Status code handling - Fetch operation" name="should return 400 message for fetch with invalid request" time="0">
+    <testcase classname="apiUtils &gt; makeFetchRequest" name="should handle failed request" time="0.002">
     </testcase>
     <testcase classname="accountErrorUtils &gt; getAccountErrorMessage &gt; Status code handling - Fetch operation" name="should return 401 message for fetch unauthorized" time="0.001">
     </testcase>
-    <testcase classname="accountErrorUtils &gt; getAccountErrorMessage &gt; Status code handling - Fetch operation" name="should return 403 message for fetch forbidden" time="0.001">
+    <testcase classname="apiUtils &gt; makeFetchRequest" name="should handle network errors" time="0.033">
     </testcase>
-    <testcase classname="accountErrorUtils &gt; getAccountErrorMessage &gt; Status code handling - Fetch operation" name="should return 404 message for fetch not found" time="0.001">
+    <testcase classname="apiUtils &gt; makeFetchRequest" name="should merge custom headers with default headers" time="0.004">
     </testcase>
-    <testcase classname="accountErrorUtils &gt; getAccountErrorMessage &gt; Custom messages handling" name="should use custom messages when provided" time="0.001">
+    <testcase classname="apiUtils &gt; makeFetchRequest" name="should include Authorization header when token is present" time="0.003">
     </testcase>
     <testcase classname="accountErrorUtils &gt; getAccountErrorMessage &gt; Custom messages handling" name="should fall back to default when custom message not found" time="0">
     </testcase>
-    <testcase classname="accountErrorUtils &gt; getAccountErrorMessage &gt; Custom messages handling" name="should override default messages with custom ones" time="0.001">
+    <testcase classname="apiUtils &gt; getApiHeaders — JWT user_id extraction" name="extracts user_id from a valid JWT and adds user-id header" time="0.002">
     </testcase>
-    <testcase classname="accountErrorUtils &gt; getAccountErrorMessage &gt; Fallback handling" name="should return fallback message for unknown status code" time="0.001">
+    <testcase classname="apiUtils &gt; getApiHeaders — JWT user_id extraction" name="falls back to userId claim when user_id is absent" time="0.002">
     </testcase>
-    <testcase classname="accountErrorUtils &gt; getAccountErrorMessage &gt; Fallback handling" name="should return fallback message for update operation" time="0.001">
+    <testcase classname="apiUtils &gt; getApiHeaders — JWT user_id extraction" name="does not add user-id header when JWT has no id claim" time="0.001">
     </testcase>
     <testcase classname="accountErrorUtils &gt; getAccountErrorMessage &gt; Fallback handling" name="should return fallback message for delete operation" time="0">
     </testcase>
-    <testcase classname="accountErrorUtils &gt; getAccountErrorMessage &gt; Fallback handling" name="should return fallback message for fetch operation" time="0.001">
+    <testcase classname="apiUtils &gt; parseJsonSafe" name="parses normal JSON without modification" time="0.001">
     </testcase>
     <testcase classname="accountErrorUtils &gt; getAccountErrorMessage &gt; Edge cases" name="should handle null error" time="0">
     </testcase>
-    <testcase classname="accountErrorUtils &gt; getAccountErrorMessage &gt; Edge cases" name="should handle undefined error" time="0.001">
+    <testcase classname="apiUtils &gt; parseJsonSafe" name="only quotes id values with 16+ digits" time="0.001">
     </testcase>
-    <testcase classname="accountErrorUtils &gt; getAccountErrorMessage &gt; Edge cases" name="should handle string error" time="0">
+    <testcase classname="apiUtils &gt; fetchWithTokenRefresh" name="makes request normally when token is not expired" time="0.002">
     </testcase>
-    <testcase classname="accountErrorUtils &gt; getAccountErrorMessage &gt; Edge cases" name="should handle number error" time="0.001">
+    <testcase classname="apiUtils &gt; fetchWithTokenRefresh" name="refreshes token before request when token is expired" time="0.002">
     </testcase>
     <testcase classname="accountErrorUtils &gt; getAccountErrorMessage &gt; Edge cases" name="should handle object without status" time="0">
     </testcase>
