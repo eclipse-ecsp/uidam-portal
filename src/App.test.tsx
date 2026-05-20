@@ -208,7 +208,7 @@ describe('DashboardGuard', () => {
   });
 
   it('renders dashboard when DASHBOARD feature flag is true and user has TenantAdmin', async () => {
-    window.history.pushState({}, '', '/uidam/dashboard');
+    window.history.pushState({}, '', '/uidam/sdp/dashboard');
     // User has TenantAdmin and DASHBOARD flag is true — should render dashboard
     scopesMock(
       (...s) => s.some(sc => ['ViewUsers', 'ManageUsers'].includes(sc)),
