@@ -49,7 +49,7 @@ import {
   LockReset as LockResetIcon,
   Devices as DevicesIcon,
 } from '@mui/icons-material';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '@store/index';
 import { toggleSidebar } from '@store/slices/uiSlice';
@@ -67,72 +67,73 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
-const navigationItems = [
-  {
-    text: 'Dashboard',
-    icon: <DashboardIcon />,
-    path: '/uidam/dashboard',
-    feature: FEATURE_FLAGS.DASHBOARD,
-    requiredScopes: ['TenantAdmin'],
-  },
-  {
-    text: 'User Management',
-    icon: <PeopleIcon />,
-    path: '/uidam/users',
-    feature: FEATURE_FLAGS.USER_MANAGEMENT,
-    requiredScopes: ['ViewUsers', 'ManageUsers'],
-  },
-  {
-    text: 'Account Management',
-    icon: <BusinessIcon />,
-    path: '/uidam/accounts',
-    feature: FEATURE_FLAGS.ACCOUNT_MANAGEMENT,
-    requiredScopes: ['ViewAccounts', 'ManageAccounts'],
-  },
-  {
-    text: 'Role Management',
-    icon: <SecurityIcon />,
-    path: '/uidam/roles',
-    feature: FEATURE_FLAGS.ROLE_MANAGEMENT,
-    requiredScopes: ['ManageUserRolesAndPermissions'],
-  },
-  {
-    text: 'Scope Management',
-    icon: <AdminPanelSettingsIcon />,
-    path: '/uidam/scopes',
-    feature: FEATURE_FLAGS.SCOPE_MANAGEMENT,
-    requiredScopes: ['ManageScopes'],
-  },
-  {
-    text: 'Approval Workflow',
-    icon: <ApprovalIcon />,
-    path: '/uidam/approvals',
-    feature: FEATURE_FLAGS.APPROVAL_WORKFLOW,
-    requiredScopes: ['ManageApprovals'],
-  },
-  {
-    text: 'Client Management',
-    icon: <AppsIcon />,
-    path: '/uidam/clients',
-    feature: FEATURE_FLAGS.CLIENT_MANAGEMENT,
-    requiredScopes: ['ManageClients'],
-  },
-  {
-    text: 'Assistant',
-    icon: <AdminPanelSettingsIcon />,
-    path: '/uidam/assistant',
-    feature: false, // Removed from sidebar as per requirement; set to true to re-enable
-    requiredScopes: [] as string[],
-  },
-].filter(item => item.feature);
-
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { tenantId = '' } = useParams<{ tenantId: string }>();
   const dispatch = useDispatch();
   const { themeMode, toggleThemeMode } = useTheme();
   const { hasAnyScope, hasScope } = useScopes();
   const canSelfManage = hasScope('SelfManage');
+
+  const navigationItems = [
+    {
+      text: 'Dashboard',
+      icon: <DashboardIcon />,
+      path: `/uidam/${tenantId}/dashboard`,
+      feature: FEATURE_FLAGS.DASHBOARD,
+      requiredScopes: ['TenantAdmin'],
+    },
+    {
+      text: 'User Management',
+      icon: <PeopleIcon />,
+      path: `/uidam/${tenantId}/users`,
+      feature: FEATURE_FLAGS.USER_MANAGEMENT,
+      requiredScopes: ['ViewUsers', 'ManageUsers'],
+    },
+    {
+      text: 'Account Management',
+      icon: <BusinessIcon />,
+      path: `/uidam/${tenantId}/accounts`,
+      feature: FEATURE_FLAGS.ACCOUNT_MANAGEMENT,
+      requiredScopes: ['ViewAccounts', 'ManageAccounts'],
+    },
+    {
+      text: 'Role Management',
+      icon: <SecurityIcon />,
+      path: `/uidam/${tenantId}/roles`,
+      feature: FEATURE_FLAGS.ROLE_MANAGEMENT,
+      requiredScopes: ['ManageUserRolesAndPermissions'],
+    },
+    {
+      text: 'Scope Management',
+      icon: <AdminPanelSettingsIcon />,
+      path: `/uidam/${tenantId}/scopes`,
+      feature: FEATURE_FLAGS.SCOPE_MANAGEMENT,
+      requiredScopes: ['ManageScopes'],
+    },
+    {
+      text: 'Approval Workflow',
+      icon: <ApprovalIcon />,
+      path: `/uidam/${tenantId}/approvals`,
+      feature: FEATURE_FLAGS.APPROVAL_WORKFLOW,
+      requiredScopes: ['ManageApprovals'],
+    },
+    {
+      text: 'Client Management',
+      icon: <AppsIcon />,
+      path: `/uidam/${tenantId}/clients`,
+      feature: FEATURE_FLAGS.CLIENT_MANAGEMENT,
+      requiredScopes: ['ManageClients'],
+    },
+    {
+      text: 'Assistant',
+      icon: <AdminPanelSettingsIcon />,
+      path: `/uidam/${tenantId}/assistant`,
+      feature: false, // Removed from sidebar as per requirement; set to true to re-enable
+      requiredScopes: [] as string[],
+    },
+  ].filter(item => item.feature);
 
   // Filter nav items by token scopes: items with no requiredScopes are always shown;
   // items with requiredScopes are shown only if the token contains at least one.
@@ -487,7 +488,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </MenuItem>
             <Divider />
             {canSelfManage && (
-              <MenuItem onClick={() => { setAnchorEl(null); navigate('/uidam/profile'); }}>
+              <MenuItem onClick={() => { setAnchorEl(null); navigate(`/uidam/${tenantId}/profile`); }}>
                 <ListItemIcon>
                   <AccountCircle fontSize="small" />
                 </ListItemIcon>
@@ -495,14 +496,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </MenuItem>
             )}
             {canSelfManage && (
-              <MenuItem onClick={() => { setAnchorEl(null); navigate('/uidam/change-password'); }}>
+              <MenuItem onClick={() => { setAnchorEl(null); navigate(`/uidam/${tenantId}/change-password`); }}>
                 <ListItemIcon>
                   <LockResetIcon fontSize="small" />
                 </ListItemIcon>
                 Change Password
               </MenuItem>
             )}
-            <MenuItem onClick={() => { setAnchorEl(null); navigate('/uidam/sessions'); }}>
+            <MenuItem onClick={() => { setAnchorEl(null); navigate(`/uidam/${tenantId}/sessions`); }}>
               <ListItemIcon>
                 <DevicesIcon fontSize="small" />
               </ListItemIcon>

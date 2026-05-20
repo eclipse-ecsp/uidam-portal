@@ -149,8 +149,13 @@ const scopesMock = (hasAnyFn: (...s: string[]) => boolean, hasFn = (_s: string) 
 // DefaultRedirect — picks the first nav item the current user can access
 // ---------------------------------------------------------------------------
 describe('DefaultRedirect', () => {
+  beforeEach(() => {
+    localStorage.setItem('uidam_tenant_id', 'sdp');
+  });
+
   afterEach(() => {
     mockUseScopes.mockReset();
+    localStorage.removeItem('uidam_tenant_id');
     window.history.pushState({}, '', '/');
   });
 
@@ -191,9 +196,14 @@ describe('DefaultRedirect', () => {
 // DashboardGuard — blocks access when feature flag is off, allows when on + TenantAdmin
 // ---------------------------------------------------------------------------
 describe('DashboardGuard', () => {
+  beforeEach(() => {
+    localStorage.setItem('uidam_tenant_id', 'sdp');
+  });
+
   afterEach(() => {
     mockUseScopes.mockReset();
     jest.resetModules();
+    localStorage.removeItem('uidam_tenant_id');
     window.history.pushState({}, '', '/');
   });
 
@@ -211,7 +221,7 @@ describe('DashboardGuard', () => {
   });
 
   it('redirects to /login from /uidam/dashboard when user has no scopes', async () => {
-    window.history.pushState({}, '', '/uidam/dashboard');
+    window.history.pushState({}, '', '/uidam/sdp/dashboard');
     scopesMock(() => false, () => false);
     render(<App />);
     await waitFor(() => {

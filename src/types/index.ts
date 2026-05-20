@@ -388,6 +388,12 @@ export interface DashboardStats {
   recentActivity: ActivityItem[];
 }
 
+export interface UserStatusDistribution {
+  activePercentage: number;
+  pendingPercentage: number;
+  blockedPercentage: number;
+}
+
 export interface ActivityItem {
   id: string;
   type: string;

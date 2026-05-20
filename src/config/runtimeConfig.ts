@@ -50,6 +50,13 @@ export const loadRuntimeConfig = async (): Promise<RuntimeConfig> => {
 
 export const getConfig = (): RuntimeConfig => runtimeConfig;
 
+/**
+ * Override a single runtime config value at runtime (e.g. to inject tenant prefix).
+ */
+export const setRuntimeConfigValue = (key: keyof RuntimeConfig, value: unknown): void => {
+  runtimeConfig = { ...runtimeConfig, [key]: value as RuntimeConfig[typeof key] };
+};
+
 // Legacy export for backward compatibility
 export const loadConfig = loadRuntimeConfig;
 
