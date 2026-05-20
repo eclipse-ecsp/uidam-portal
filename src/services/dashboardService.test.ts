@@ -52,11 +52,6 @@ describe('DashboardService', () => {
     externalUsers: 10,
     federatedUsers: 5,
     userAccountMappings: 120,
-    userStatusDistribution: {
-      activePercentage: 80.0,
-      pendingPercentage: 15.0,
-      blockedPercentage: 5.0,
-    },
     recentActivity: [
       {
         id: '1',
@@ -138,9 +133,6 @@ describe('DashboardService', () => {
       expect(result.data?.externalUsers).toBe(10);
       expect(result.data?.federatedUsers).toBe(5);
       expect(result.data?.userAccountMappings).toBe(120);
-      expect(result.data?.userStatusDistribution.activePercentage).toBe(80.0);
-      expect(result.data?.userStatusDistribution.pendingPercentage).toBe(15.0);
-      expect(result.data?.userStatusDistribution.blockedPercentage).toBe(5.0);
       expect(result.data?.recentActivity).toHaveLength(1);
     });
   });

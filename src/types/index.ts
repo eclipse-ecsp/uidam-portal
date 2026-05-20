@@ -385,14 +385,7 @@ export interface DashboardStats {
   externalUsers: number;
   federatedUsers: number;
   userAccountMappings: number;
-  userStatusDistribution: UserStatusDistribution;
   recentActivity: ActivityItem[];
-}
-
-export interface UserStatusDistribution {
-  activePercentage: number;
-  pendingPercentage: number;
-  blockedPercentage: number;
 }
 
 export interface ActivityItem {

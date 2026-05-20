@@ -364,11 +364,11 @@ const Dashboard: React.FC = () => {
                 <Box flex={1} mr={1}>
                   <LinearProgress 
                     variant="determinate" 
-                    value={stats?.userStatusDistribution?.activePercentage ?? 0} 
+                    value={stats?.totalUsers ? (stats.activeUsers / stats.totalUsers) * 100 : 0} 
                     sx={{ height: 8, borderRadius: 4 }}
                   />
                 </Box>
-                <Typography variant="body2">{stats?.userStatusDistribution?.activePercentage?.toFixed(1) ?? 0}%</Typography>
+                <Typography variant="body2">{stats?.totalUsers ? ((stats.activeUsers / stats.totalUsers) * 100).toFixed(1) : '0.0'}%</Typography>
               </Box>
               <Typography variant="caption" color="text.secondary">
                 Percentage of active users
@@ -407,7 +407,7 @@ const Dashboard: React.FC = () => {
                   <Typography variant="body2">Active</Typography>
                 </Box>
                 <Typography variant="body2" fontWeight={600}>
-                  {stats?.userStatusDistribution?.activePercentage?.toFixed(1) ?? '0.0'}%
+                  {stats?.totalUsers ? ((stats.activeUsers / stats.totalUsers) * 100).toFixed(1) : '0.0'}%
                 </Typography>
               </Box>
               
@@ -425,7 +425,7 @@ const Dashboard: React.FC = () => {
                   <Typography variant="body2">Pending</Typography>
                 </Box>
                 <Typography variant="body2" fontWeight={600}>
-                  {stats?.userStatusDistribution?.pendingPercentage?.toFixed(1) ?? '0.0'}%
+                  {stats?.totalUsers ? ((stats.pendingUsers / stats.totalUsers) * 100).toFixed(1) : '0.0'}%
                 </Typography>
               </Box>
               
@@ -443,7 +443,7 @@ const Dashboard: React.FC = () => {
                   <Typography variant="body2">Blocked</Typography>
                 </Box>
                 <Typography variant="body2" fontWeight={600}>
-                  {stats?.userStatusDistribution?.blockedPercentage?.toFixed(1) ?? '0.0'}%
+                  {stats?.totalUsers ? ((stats.blockedUsers / stats.totalUsers) * 100).toFixed(1) : '0.0'}%
                 </Typography>
               </Box>
 
