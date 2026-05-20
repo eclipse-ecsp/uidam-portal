@@ -385,7 +385,6 @@ export interface DashboardStats {
   externalUsers: number;
   federatedUsers: number;
   userAccountMappings: number;
-  userStatusDistribution: UserStatusDistribution;
   recentActivity: ActivityItem[];
 }
 
