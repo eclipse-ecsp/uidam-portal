@@ -20,7 +20,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter } from 'react-router-dom';
 import Login from './Login';
-import { authSlice } from '../../store/slices/authSlice';
+import { authSlice, loginStart } from '../../store/slices/authSlice';
 import { authService } from '../../services/auth.service';
 
 // Mock runtime config so OAUTH_CONFIG.TOKEN_STORAGE_KEY resolves to a known value
@@ -138,16 +138,18 @@ describe('Login', () => {
     });
 
     it('shows loading state when login is in progress', () => {
-      const store = createMockStore({ isLoading: true });
+      const store = createMockStore();
       renderLogin(store);
+      act(() => { store.dispatch(loginStart()); });
 
       expect(screen.getByText('Redirecting...')).toBeInTheDocument();
       expect(screen.getByRole('button')).toBeDisabled();
     });
 
     it('disables button during loading', () => {
-      const store = createMockStore({ isLoading: true });
+      const store = createMockStore();
       renderLogin(store);
+      act(() => { store.dispatch(loginStart()); });
 
       const button = screen.getByRole('button');
       expect(button).toBeDisabled();
@@ -250,8 +252,9 @@ describe('Login', () => {
     });
 
     it('shows progress indicator when loading', () => {
-      const store = createMockStore({ isLoading: true });
+      const store = createMockStore();
       renderLogin(store);
+      act(() => { store.dispatch(loginStart()); });
 
       expect(screen.getByRole('progressbar')).toBeInTheDocument();
     });

@@ -30,9 +30,9 @@ import {
   Login as LoginIcon,
 } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { RootState } from '@store/index';
-import { loginStart, loginFailure } from '@store/slices/authSlice';
+import { loginStart, loginFailure, resetLoading } from '@store/slices/authSlice';
 import { authService } from '@services/auth.service';
 import { OAUTH_CONFIG } from '@config/app.config';
 import { setRuntimeConfigValue } from '@config/runtimeConfig';
@@ -42,9 +42,17 @@ const TENANT_ID_STORAGE_KEY = 'uidam_tenant_id';
 const Login: React.FC = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const { tenantId: tenantIdFromUrl } = useParams<{ tenantId: string }>();
   const { isLoading, error, isAuthenticated } = useSelector((state: RootState) => state.auth);
+
+  // Reset stuck loading state when user navigates back from OAuth redirect
+  useEffect(() => {
+    dispatch(resetLoading());
+  }, [dispatch]);
   const [tenantId, setTenantId] = useState<string>(
-    localStorage.getItem(TENANT_ID_STORAGE_KEY) ?? ''
+    tenantIdFromUrl?.toLowerCase()
+    ?? localStorage.getItem(TENANT_ID_STORAGE_KEY)
+    ?? ''
   );
 
   // Redirect to dashboard immediately if the user is already authenticated
