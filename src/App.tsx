@@ -107,6 +107,7 @@ const AppContent: React.FC = () => {
         <React.Suspense fallback={<div>Loading...</div>}>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/:tenantId/login" element={<Login />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             {/* Legacy redirect: bare /dashboard → first accessible page */}
             <Route path="/dashboard" element={<DefaultRedirect />} />
