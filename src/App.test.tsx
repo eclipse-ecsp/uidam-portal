@@ -193,7 +193,7 @@ describe('DefaultRedirect', () => {
 });
 
 // ---------------------------------------------------------------------------
-// DashboardGuard — blocks access when feature flag is off, allows when on + TenantAdmin
+// DashboardGuard — blocks access when feature flag is off, allows when on + ManageAccounts
 // ---------------------------------------------------------------------------
 describe('DashboardGuard', () => {
   beforeEach(() => {
@@ -207,12 +207,12 @@ describe('DashboardGuard', () => {
     window.history.pushState({}, '', '/');
   });
 
-  it('renders dashboard when DASHBOARD feature flag is true and user has TenantAdmin', async () => {
+  it('renders dashboard when DASHBOARD feature flag is true and user has ManageAccounts', async () => {
     window.history.pushState({}, '', '/uidam/sdp/dashboard');
-    // User has TenantAdmin and DASHBOARD flag is true — should render dashboard
+    // User has ManageAccounts and DASHBOARD flag is true — should render dashboard
     scopesMock(
       (...s) => s.some(sc => ['ViewUsers', 'ManageUsers'].includes(sc)),
-      (s) => s === 'TenantAdmin',
+      (s) => s === 'ManageAccounts',
     );
     render(<App />);
     await waitFor(() => {
