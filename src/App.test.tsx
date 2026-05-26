@@ -167,8 +167,19 @@ describe('DefaultRedirect', () => {
     });
   });
 
-  it('redirects to /uidam/accounts when user has only account scopes', async () => {
-    scopesMock((...s) => s.some(sc => ['ViewAccounts', 'ManageAccounts'].includes(sc)));
+  it('redirects to /uidam/dashboard when user has ManageAccounts scope', async () => {
+    scopesMock(
+      (...s) => s.some(sc => ['ViewAccounts', 'ManageAccounts'].includes(sc)),
+      (s) => s === 'ManageAccounts',
+    );
+    render(<App />);
+    await waitFor(() => {
+      expect(screen.getByText('Dashboard Component')).toBeInTheDocument();
+    });
+  });
+
+  it('redirects to /uidam/accounts when user has only ViewAccounts scope', async () => {
+    scopesMock((...s) => s.some(sc => ['ViewAccounts'].includes(sc)));
     render(<App />);
     await waitFor(() => {
       expect(screen.getByText('Account Management Component')).toBeInTheDocument();
