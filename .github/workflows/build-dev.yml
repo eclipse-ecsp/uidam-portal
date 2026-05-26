@@ -17,6 +17,8 @@ jobs:
     needs: [build-and-test]
     uses: eclipse-ecsp/.github/.github/workflows/workflow-nodejs-docker-push.yml@nodejs
     with:
+      registry: 'docker.io'
+      image-name: 'uidam-portal'
       image-tag: ${{ github.sha }}
     secrets:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
