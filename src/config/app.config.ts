@@ -19,8 +19,11 @@
 import { getConfig } from './runtimeConfig';
 
 // Feature flags for modular architecture
+// Flags read from runtime config.json (REACT_APP_FEATURE_*) with true as default.
 export const FEATURE_FLAGS = {
-  DASHBOARD: true,
+  get DASHBOARD() {
+    return getConfig().REACT_APP_FEATURE_DASHBOARD !== false;
+  },
   USER_MANAGEMENT: true,
   ACCOUNT_MANAGEMENT: true,
   ROLE_MANAGEMENT: true,

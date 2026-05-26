@@ -172,8 +172,9 @@ describe('Layout', () => {
     expect(screen.getAllByText('Scope Management')[0]).toBeInTheDocument();
     expect(screen.getAllByText('Approval Workflow')[0]).toBeInTheDocument();
     expect(screen.getAllByText('Client Management')[0]).toBeInTheDocument();
-    // Dashboard and Assistant are currently feature-flagged off (feature: false)
-    expect(screen.queryByRole('button', { name: /Dashboard/i })).not.toBeInTheDocument();
+    // Dashboard is now visible (feature flag defaults to true, user has ManageAccounts scope)
+    expect(screen.getByRole('button', { name: /Dashboard/i })).toBeInTheDocument();
+    // Assistant is still feature-flagged off (feature: false)
     expect(screen.queryByRole('button', { name: /Assistant/i })).not.toBeInTheDocument();
   });
 
