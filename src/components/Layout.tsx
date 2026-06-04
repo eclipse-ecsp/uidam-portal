@@ -82,7 +82,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       icon: <DashboardIcon />,
       path: `/uidam/${tenantId}/dashboard`,
       feature: FEATURE_FLAGS.DASHBOARD,
-      requiredScopes: ['ManageAccounts'],
+      requiredScopes: ['ManageAccounts', 'TenantAdmin'],
     },
     {
       text: 'User Management',
