@@ -178,6 +178,17 @@ describe('DefaultRedirect', () => {
     });
   });
 
+  it('redirects to /uidam/dashboard when user has TenantAdmin scope', async () => {
+    scopesMock(
+      (...s) => s.some(sc => ['TenantAdmin'].includes(sc)),
+      (s) => s === 'TenantAdmin',
+    );
+    render(<App />);
+    await waitFor(() => {
+      expect(screen.getByText('Dashboard Component')).toBeInTheDocument();
+    });
+  });
+
   it('redirects to /uidam/accounts when user has only ViewAccounts scope', async () => {
     scopesMock((...s) => s.some(sc => ['ViewAccounts'].includes(sc)));
     render(<App />);
@@ -204,7 +215,7 @@ describe('DefaultRedirect', () => {
 });
 
 // ---------------------------------------------------------------------------
-// DashboardGuard — blocks access when feature flag is off, allows when on + ManageAccounts
+// DashboardGuard — blocks access when feature flag is off, allows when on + ManageAccounts or TenantAdmin
 // ---------------------------------------------------------------------------
 describe('DashboardGuard', () => {
   beforeEach(() => {
@@ -222,8 +233,21 @@ describe('DashboardGuard', () => {
     window.history.pushState({}, '', '/uidam/sdp/dashboard');
     // User has ManageAccounts and DASHBOARD flag is true — should render dashboard
     scopesMock(
-      (...s) => s.some(sc => ['ViewUsers', 'ManageUsers'].includes(sc)),
+      (...s) => s.some(sc => ['ViewUsers', 'ManageUsers', 'ManageAccounts'].includes(sc)),
       (s) => s === 'ManageAccounts',
+    );
+    render(<App />);
+    await waitFor(() => {
+      expect(screen.getByText('Dashboard Component')).toBeInTheDocument();
+    });
+  });
+
+  it('renders dashboard when DASHBOARD feature flag is true and user has TenantAdmin', async () => {
+    window.history.pushState({}, '', '/uidam/sdp/dashboard');
+    // User has TenantAdmin and DASHBOARD flag is true — should render dashboard
+    scopesMock(
+      (...s) => s.some(sc => ['TenantAdmin'].includes(sc)),
+      (s) => s === 'TenantAdmin',
     );
     render(<App />);
     await waitFor(() => {
