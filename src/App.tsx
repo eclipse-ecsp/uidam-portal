@@ -36,7 +36,7 @@ import { useScopes } from '@hooks/useScopes';
 const TENANT_ID_STORAGE_KEY = 'uidam_tenant_id';
 
 const getNavItems = (tenantId: string) => [
-  { path: `/uidam/${tenantId}/dashboard`, feature: FEATURE_FLAGS.DASHBOARD, requiredScopes: ['ManageAccounts'] },
+  { path: `/uidam/${tenantId}/dashboard`, feature: FEATURE_FLAGS.DASHBOARD, requiredScopes: ['ManageAccounts', 'TenantAdmin'] },
   { path: `/uidam/${tenantId}/users`,     feature: FEATURE_FLAGS.USER_MANAGEMENT,    requiredScopes: ['ViewUsers', 'ManageUsers'] },
   { path: `/uidam/${tenantId}/accounts`,  feature: FEATURE_FLAGS.ACCOUNT_MANAGEMENT, requiredScopes: ['ViewAccounts', 'ManageAccounts'] },
   { path: `/uidam/${tenantId}/roles`,     feature: FEATURE_FLAGS.ROLE_MANAGEMENT,    requiredScopes: ['ManageUserRolesAndPermissions'] },
@@ -72,11 +72,11 @@ const DefaultRedirect: React.FC = () => {
   return <Navigate to={first ? first.path : '/login'} replace />;
 };
 
-// Guard: renders Dashboard only when the feature is enabled AND the user has ManageAccounts scope.
+// Guard: renders Dashboard only when the feature is enabled AND the user has ManageAccounts or TenantAdmin scope.
 // Redirects to the first accessible page otherwise.
 const DashboardGuard: React.FC = () => {
-  const { hasScope } = useScopes();
-  if (!FEATURE_FLAGS.DASHBOARD || !hasScope('ManageAccounts')) {
+  const { hasAnyScope } = useScopes();
+  if (!FEATURE_FLAGS.DASHBOARD || !hasAnyScope('ManageAccounts', 'TenantAdmin')) {
     return <DefaultRedirect />;
   }
   return <Dashboard />;
