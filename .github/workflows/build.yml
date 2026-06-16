@@ -11,7 +11,7 @@ jobs:
   build-and-test:
     uses: eclipse-ecsp/.github/.github/workflows/workflow-nodejs-build.yml@nodejs
     with:
-      node-version: '19.5.0'
+      node-version: '20.x'
       sonar-analysis: true
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
