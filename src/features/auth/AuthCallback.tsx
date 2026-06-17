@@ -61,7 +61,8 @@ const AuthCallback: React.FC = () => {
         
         console.log('OAuth2 callback successful:', authResult.user);
         dispatch(loginSuccess(authResult));
-        navigate('/uidam/dashboard');
+        const tenantId = localStorage.getItem('uidam_tenant_id') ?? '';
+        navigate(tenantId ? `/uidam/${tenantId}/dashboard` : '/login');
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Authentication failed';
         console.error('AuthCallback error:', err);

@@ -293,6 +293,32 @@ export class AccountService {
     return 'Failed to load accounts';
   }
 
+  private static async resolveTotalCount(
+    filter: AccountFilter,
+    params: AccountSearchParams | undefined,
+    accounts: Account[]
+  ): Promise<number> {
+    if (!params?.pageSize) {
+      return accounts.length;
+    }
+    if (accounts.length === params.pageSize) {
+      try {
+        const totalEndpoint = '/v1/accounts/filter?pageNumber=0&pageSize=10000';
+        const totalResponse: { items?: Account[] } = await userManagementApi.post(totalEndpoint, filter);
+        const total = (totalResponse.items || []).length;
+        logger.debug('Account total count fetched:', total);
+        return total;
+      } catch (error) {
+        logger.warn('Failed to get total count, using estimate:', error);
+        return (params.pageNumber || 0) * params.pageSize + accounts.length;
+      }
+    }
+    if (params.pageNumber) {
+      return params.pageNumber * params.pageSize + accounts.length;
+    }
+    return accounts.length;
+  }
+
   /**
    * Filters and searches accounts based on criteria with pagination support
    * @param {AccountFilter} filter - Filter criteria for accounts
@@ -335,24 +361,7 @@ export class AccountService {
       const accounts = response.items || [];
       
       // Get total count for pagination
-      let totalCount = accounts.length;
-      
-      // If we got a full page of results, there might be more - fetch total count
-      if (params && params.pageSize && accounts.length === params.pageSize) {
-        try {
-          const totalEndpoint = '/v1/accounts/filter?pageNumber=0&pageSize=10000';
-          const totalResponse: { items?: Account[] } = await userManagementApi.post(totalEndpoint, filter);
-          totalCount = (totalResponse.items || []).length;
-          logger.debug('Account total count fetched:', totalCount);
-        } catch (error) {
-          logger.warn('Failed to get total count, using estimate:', error);
-          // If total count fetch fails, estimate based on current page
-          totalCount = (params.pageNumber || 0) * params.pageSize + accounts.length;
-        }
-      } else if (params && params.pageSize && params.pageNumber) {
-        // Current page has fewer results than requested, so we know the total
-        totalCount = params.pageNumber * params.pageSize + accounts.length;
-      }
+      const totalCount = await this.resolveTotalCount(filter, params, accounts);
       
       // Return the data in a consistent format
       return {

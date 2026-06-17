@@ -49,15 +49,17 @@ import {
   LockReset as LockResetIcon,
   Devices as DevicesIcon,
 } from '@mui/icons-material';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '@store/index';
 import { toggleSidebar } from '@store/slices/uiSlice';
 import { logout, updateUser } from '@store/slices/authSlice';
 import { useTheme } from '@hooks/useTheme';
-import { FEATURE_FLAGS } from '@config/app.config';
+import { useScopes } from '@hooks/useScopes';
+import { FEATURE_FLAGS, OAUTH_CONFIG } from '@config/app.config';
 import { UserService } from '@services/userService';
 import { authService } from '@services/auth.service';
+import { SessionService } from '@services/sessionService';
 
 const drawerWidth = 240;
 
@@ -65,69 +67,80 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
-const navigationItems = [
-  {
-    text: 'Dashboard',
-    icon: <DashboardIcon />,
-    path: '/uidam/dashboard',
-    feature: true, // Always available
-  },
-  {
-    text: 'User Management',
-    icon: <PeopleIcon />,
-    path: '/uidam/users',
-    feature: FEATURE_FLAGS.USER_MANAGEMENT,
-  },
-  {
-    text: 'Account Management',
-    icon: <BusinessIcon />,
-    path: '/uidam/accounts',
-    feature: FEATURE_FLAGS.ACCOUNT_MANAGEMENT,
-  },
-  {
-    text: 'Role Management',
-    icon: <SecurityIcon />,
-    path: '/uidam/roles',
-    feature: FEATURE_FLAGS.ROLE_MANAGEMENT,
-  },
-  {
-    text: 'Scope Management',
-    icon: <AdminPanelSettingsIcon />,
-    path: '/uidam/scopes',
-    feature: FEATURE_FLAGS.SCOPE_MANAGEMENT,
-  },
-  {
-    text: 'Approval Workflow',
-    icon: <ApprovalIcon />,
-    path: '/uidam/approvals',
-    feature: FEATURE_FLAGS.APPROVAL_WORKFLOW,
-  },
-  {
-    text: 'Client Management',
-    icon: <AppsIcon />,
-    path: '/uidam/clients',
-    feature: FEATURE_FLAGS.CLIENT_MANAGEMENT,
-  },
-  {
-    text: 'Assistant',
-    icon: <AdminPanelSettingsIcon />,
-    path: '/uidam/assistant',
-    feature: true,
-  },
-  {
-    text: 'Active Sessions',
-    icon: <DevicesIcon />,
-    path: '/uidam/sessions',
-    feature: true,
-  },
-].filter(item => item.feature);
-
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { tenantId = '' } = useParams<{ tenantId: string }>();
   const dispatch = useDispatch();
   const { themeMode, toggleThemeMode } = useTheme();
-  
+  const { hasAnyScope, hasScope } = useScopes();
+  const canSelfManage = hasScope('SelfManage');
+
+  const navigationItems = [
+    {
+      text: 'Dashboard',
+      icon: <DashboardIcon />,
+      path: `/uidam/${tenantId}/dashboard`,
+      feature: FEATURE_FLAGS.DASHBOARD,
+      requiredScopes: ['ManageAccounts', 'TenantAdmin'],
+    },
+    {
+      text: 'User Management',
+      icon: <PeopleIcon />,
+      path: `/uidam/${tenantId}/users`,
+      feature: FEATURE_FLAGS.USER_MANAGEMENT,
+      requiredScopes: ['ViewUsers', 'ManageUsers'],
+    },
+    {
+      text: 'Account Management',
+      icon: <BusinessIcon />,
+      path: `/uidam/${tenantId}/accounts`,
+      feature: FEATURE_FLAGS.ACCOUNT_MANAGEMENT,
+      requiredScopes: ['ViewAccounts', 'ManageAccounts'],
+    },
+    {
+      text: 'Role Management',
+      icon: <SecurityIcon />,
+      path: `/uidam/${tenantId}/roles`,
+      feature: FEATURE_FLAGS.ROLE_MANAGEMENT,
+      requiredScopes: ['ManageUserRolesAndPermissions'],
+    },
+    {
+      text: 'Scope Management',
+      icon: <AdminPanelSettingsIcon />,
+      path: `/uidam/${tenantId}/scopes`,
+      feature: FEATURE_FLAGS.SCOPE_MANAGEMENT,
+      requiredScopes: ['ManageScopes'],
+    },
+    {
+      text: 'Approval Workflow',
+      icon: <ApprovalIcon />,
+      path: `/uidam/${tenantId}/approvals`,
+      feature: FEATURE_FLAGS.APPROVAL_WORKFLOW,
+      requiredScopes: ['ManageApprovals'],
+    },
+    {
+      text: 'Client Management',
+      icon: <AppsIcon />,
+      path: `/uidam/${tenantId}/clients`,
+      feature: FEATURE_FLAGS.CLIENT_MANAGEMENT,
+      requiredScopes: ['ManageClients'],
+    },
+    {
+      text: 'Assistant',
+      icon: <AdminPanelSettingsIcon />,
+      path: `/uidam/${tenantId}/assistant`,
+      feature: false, // Removed from sidebar as per requirement; set to true to re-enable
+      requiredScopes: [] as string[],
+    },
+  ].filter(item => item.feature);
+
+  // Filter nav items by token scopes: items with no requiredScopes are always shown;
+  // items with requiredScopes are shown only if the token contains at least one.
+  const visibleNavItems = navigationItems.filter(
+    item => item.requiredScopes.length === 0 || hasAnyScope(...item.requiredScopes)
+  );
+
   const { sidebarOpen } = useSelector((state: RootState) => state.ui);
   const { user } = useSelector((state: RootState) => state.auth);
   
@@ -137,6 +150,64 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   React.useEffect(() => {
     setAnchorEl(null);
   }, [location.pathname]);
+
+  // Cross-tab logout detection via the browser Storage event.
+  // The browser fires a 'storage' event on every OTHER tab/window in the same
+  // origin whenever localStorage changes. When Window 1 logs out and removes
+  // the access token, Window 2 receives this event immediately and logs out too
+  // — no page refresh, no polling delay.
+  React.useEffect(() => {
+    const handleStorageChange = (event: StorageEvent) => {
+      if (
+        event.storageArea === localStorage &&
+        event.key === OAUTH_CONFIG.TOKEN_STORAGE_KEY &&
+        event.newValue === null          // key was removed
+      ) {
+        dispatch(logout());
+        navigate('/login');
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [dispatch, navigate]);
+
+  // Session validity heartbeat — polls every 30 s to detect remote token revocation.
+  // If the token was invalidated server-side (e.g. another admin terminated this
+  // session), SessionService.request() will clear localStorage and redirect to /login.
+  // Any other error (network, 5xx) is silently ignored so normal usage is unaffected.
+  React.useEffect(() => {
+    const HEARTBEAT_INTERVAL = 30_000;
+    const id = setInterval(async () => {
+      try {
+        await SessionService.getActiveSessions();
+      } catch {
+        // 401 → SessionService already cleared tokens and redirected.
+        // Other transient errors are intentionally swallowed here.
+      }
+    }, HEARTBEAT_INTERVAL);
+    return () => clearInterval(id);
+  }, []);
+
+  // Visibility-based session check — fires immediately when this tab or window
+  // becomes visible again (e.g. user alt-tabs back, un-minimises, or switches
+  // browser windows). This is the primary mechanism for detecting cross-browser
+  // session invalidation: when the user logs in on Browser B the server revokes
+  // Browser A's token; the next time the user looks at Browser A the check fires
+  // and redirects to /login without waiting for the next 30-second heartbeat tick.
+  React.useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible') {
+        try {
+          await SessionService.getActiveSessions();
+        } catch {
+          // 401 → SessionService already cleared tokens and redirected.
+          // Other transient errors are intentionally swallowed here.
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
 
   // Fetch full user profile on mount to get firstName and lastName
   React.useEffect(() => {
@@ -174,10 +245,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       }
     };
 
-    if (user && (!user.firstName || !user.lastName)) {
+    if (user) {
       fetchUserProfile();
     }
-  }, [dispatch, user]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dispatch, user?.id]);
 
   const handleDrawerToggle = () => {
     dispatch(toggleSidebar());
@@ -233,7 +305,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       </Toolbar>
       <Divider />
       <List>
-        {navigationItems.map((item) => (
+        {visibleNavItems.map((item) => (
           <ListItem key={item.text} disablePadding>
             <ListItemButton
               selected={location.pathname.startsWith(item.path)}
@@ -342,7 +414,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               letterSpacing: '0.5px'
             }}
           >
-            {navigationItems.find(item => location.pathname.startsWith(item.path))?.text ?? 'Dashboard'}
+            {visibleNavItems.find(item => location.pathname.startsWith(item.path))?.text ?? 'Dashboard'}
           </Typography>
           
           <IconButton color="inherit" onClick={toggleThemeMode}>
@@ -359,7 +431,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             color="inherit"
           >
             <Avatar sx={{ width: 32, height: 32 }}>
-              {user?.firstName?.[0] ?? user?.userName?.[0] ?? 'U'}
+              {(user?.firstName?.[0] ?? user?.userName?.split('@')[0]?.[0] ?? user?.email?.split('@')[0]?.[0] ?? 'U').toUpperCase()}
             </Avatar>
           </IconButton>
           
@@ -408,22 +480,30 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 ? user.lastName 
                   ? `${user.firstName} ${user.lastName}`
                   : user.firstName
-                : user?.userName || 'User'}
+                : user?.userName
+                  ? user.userName.split('@')[0]
+                  : user?.email
+                    ? user.email.split('@')[0]
+                    : 'User'}
             </MenuItem>
             <Divider />
-            <MenuItem onClick={() => { setAnchorEl(null); navigate('/uidam/profile'); }}>
-              <ListItemIcon>
-                <AccountCircle fontSize="small" />
-              </ListItemIcon>
-              Profile
-            </MenuItem>
-            <MenuItem onClick={() => { setAnchorEl(null); navigate('/uidam/change-password'); }}>
-              <ListItemIcon>
-                <LockResetIcon fontSize="small" />
-              </ListItemIcon>
-              Change Password
-            </MenuItem>
-            <MenuItem onClick={() => { setAnchorEl(null); navigate('/uidam/sessions'); }}>
+            {canSelfManage && (
+              <MenuItem onClick={() => { setAnchorEl(null); navigate(`/uidam/${tenantId}/profile`); }}>
+                <ListItemIcon>
+                  <AccountCircle fontSize="small" />
+                </ListItemIcon>
+                Profile
+              </MenuItem>
+            )}
+            {canSelfManage && (
+              <MenuItem onClick={() => { setAnchorEl(null); navigate(`/uidam/${tenantId}/change-password`); }}>
+                <ListItemIcon>
+                  <LockResetIcon fontSize="small" />
+                </ListItemIcon>
+                Change Password
+              </MenuItem>
+            )}
+            <MenuItem onClick={() => { setAnchorEl(null); navigate(`/uidam/${tenantId}/sessions`); }}>
               <ListItemIcon>
                 <DevicesIcon fontSize="small" />
               </ListItemIcon>

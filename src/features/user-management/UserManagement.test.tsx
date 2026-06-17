@@ -15,10 +15,25 @@
 *
 * <p>SPDX-License-Identifier: Apache-2.0
 ********************************************************************************/
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render as rtlRender, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Provider } from 'react-redux';
+import { configureStore } from '@reduxjs/toolkit';
+import { authSlice } from '@store/slices/authSlice';
+import { uiSlice } from '@store/slices/uiSlice';
 import UserManagement from './UserManagement';
 import { UserService, User } from '../../services/userService';
+
+// Wrap component in Redux Provider — required because UserManagement uses useSelector
+const render = (ui: React.ReactElement) => {
+  const testStore = configureStore({
+    reducer: {
+      auth: authSlice.reducer,
+      ui: uiSlice.reducer,
+    },
+  });
+  return rtlRender(<Provider store={testStore}>{ui}</Provider>);
+};
 
 // Mock services
 jest.mock('../../services/userService');
@@ -80,6 +95,16 @@ jest.mock('./components/DeleteUserDialog', () => ({
 // Mock UserService - will be configured in tests
 jest.mock('../../services/userService');
 
+jest.mock('./components/AdminSessionsModal', () => ({
+  __esModule: true,
+  default: ({ open, onClose }: { open: boolean; onClose: () => void }) =>
+    open ? (
+      <div data-testid="admin-sessions-modal">
+        <button onClick={onClose}>Close</button>
+      </div>
+    ) : null,
+}));
+
 jest.mock('./components/ManageUserAccountsModal', () => ({
   __esModule: true,
   default: ({ open, onClose, onSuccess }: { open: boolean; onClose: () => void; onSuccess: (msg: string) => void }) =>
@@ -135,6 +160,7 @@ const mockUsers: User[] = [
 describe('UserManagement', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    localStorage.setItem('uidam_token_scopes', 'SelfManage ViewUsers ManageUsers ManageUserRolesAndPermissions ManageAccounts ViewAccounts');
     (UserService.filterUsersV2 as jest.Mock).mockResolvedValue(mockUsers);
   });
 
@@ -933,6 +959,121 @@ describe('UserManagement', () => {
       
       // Note: The error is shown in snackbar, not as an alert in this implementation
       expect(screen.getByText(/Failed to load users/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('Admin Sessions', () => {
+    beforeEach(async () => {
+      (UserService.filterUsersV2 as jest.Mock).mockResolvedValue(mockUsers);
+      render(<UserManagement />);
+      await waitFor(() => {
+        expect(screen.getByText('testuser1')).toBeInTheDocument();
+      });
+    });
+
+    it('should open admin sessions modal when clicking Manage Active Sessions', async () => {
+      const user = userEvent.setup();
+      const actionButtons = screen.getAllByRole('button', { name: /actions/i });
+
+      await user.click(actionButtons[0]);
+      const sessionsButton = await screen.findByText('Manage Active Sessions');
+      await user.click(sessionsButton);
+
+      expect(screen.getByTestId('admin-sessions-modal')).toBeInTheDocument();
+    });
+
+    it('should close admin sessions modal', async () => {
+      const user = userEvent.setup();
+      const actionButtons = screen.getAllByRole('button', { name: /actions/i });
+
+      await user.click(actionButtons[0]);
+      const sessionsButton = await screen.findByText('Manage Active Sessions');
+      await user.click(sessionsButton);
+
+      expect(screen.getByTestId('admin-sessions-modal')).toBeInTheDocument();
+
+      const closeButton = within(screen.getByTestId('admin-sessions-modal')).getByRole('button', { name: /close/i });
+      await user.click(closeButton);
+
+      expect(screen.queryByTestId('admin-sessions-modal')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Response Format Handling', () => {
+    it('should handle response wrapped in data property', async () => {
+      (UserService.filterUsersV2 as jest.Mock).mockResolvedValue({ data: mockUsers });
+
+      render(<UserManagement />);
+
+      await waitFor(() => {
+        expect(screen.getByText('testuser1')).toBeInTheDocument();
+      });
+    });
+
+    it('should fetch total count when page is exactly full (rowsPerPage=10)', async () => {
+      // Fill exactly one page so the total-count secondary call is triggered
+      const fullPageUsers = Array.from({ length: 10 }, (_, i) => ({
+        ...mockUsers[0],
+        id: String(i + 1),
+        userName: `pageuser${i + 1}`,
+        email: `pageuser${i + 1}@example.com`,
+      }));
+      (UserService.filterUsersV2 as jest.Mock).mockResolvedValue(fullPageUsers);
+
+      render(<UserManagement />);
+
+      await waitFor(() => {
+        // Two calls: initial page load + total-count fetch
+        expect((UserService.filterUsersV2 as jest.Mock).mock.calls.length).toBeGreaterThanOrEqual(2);
+      });
+
+      // Verify total-count call uses large pageSize
+      const calls = (UserService.filterUsersV2 as jest.Mock).mock.calls;
+      const countCall = calls.find(
+        (c: unknown[]) => (c[1] as { pageSize: number }).pageSize === 10000
+      );
+      expect(countCall).toBeDefined();
+    });
+
+    it('should handle total count fetch failure gracefully', async () => {
+      const fullPageUsers = Array.from({ length: 10 }, (_, i) => ({
+        ...mockUsers[0],
+        id: String(i + 1),
+        userName: `pageuser${i + 1}`,
+        email: `pageuser${i + 1}@example.com`,
+      }));
+      // First call succeeds (page), second call fails (count)
+      (UserService.filterUsersV2 as jest.Mock)
+        .mockResolvedValueOnce(fullPageUsers)
+        .mockRejectedValueOnce(new Error('Count fetch failed'));
+
+      render(<UserManagement />);
+
+      await waitFor(() => {
+        expect(screen.getByText('pageuser1')).toBeInTheDocument();
+      });
+
+      // Component should still render users despite count fetch failing
+      expect(screen.getByText('pageuser1')).toBeInTheDocument();
+    });
+
+    it('should handle total count response wrapped in data property', async () => {
+      const fullPageUsers = Array.from({ length: 10 }, (_, i) => ({
+        ...mockUsers[0],
+        id: String(i + 1),
+        userName: `pageuser${i + 1}`,
+        email: `pageuser${i + 1}@example.com`,
+      }));
+      // Page call returns array, count call returns { data: [...] } format
+      (UserService.filterUsersV2 as jest.Mock)
+        .mockResolvedValueOnce(fullPageUsers)
+        .mockResolvedValueOnce({ data: fullPageUsers });
+
+      render(<UserManagement />);
+
+      await waitFor(() => {
+        expect(screen.getByText('pageuser1')).toBeInTheDocument();
+      });
     });
   });
 });
