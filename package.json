@@ -100,9 +100,7 @@
     "rollup": ">=4.58.1",
     "follow-redirects": ">=1.15.12",
     "brace-expansion": ">=2.0.3",
-    "uuid": "^9.0.1",
-    "@babel/plugin-transform-modules-systemjs": ">=7.28.6",
-    "esbuild": ">=0.24.2"
+    "uuid": "^9.0.1"
   },
   "engines": {
     "node": ">=20.0.0",
