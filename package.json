@@ -86,8 +86,7 @@
     "handlebars": ">=4.7.9",
     "path-to-regexp": "0.1.13",
     "defu": ">=6.1.5",
-    "picomatch": ">=4.0.4",
-    "rollup": ">=4.58.1"
+    "picomatch": ">=4.0.4"
   },
   "engines": {
     "node": ">=19.5.0",
