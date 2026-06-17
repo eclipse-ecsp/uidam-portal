@@ -13,7 +13,7 @@
     "preview": "vite preview",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage --testPathIgnorePatterns=/node_modules/ --testPathIgnorePatterns=Layout.test.tsx --testPathIgnorePatterns=apiUtils.test.ts --testPathIgnorePatterns=auth.service.test.ts --testPathIgnorePatterns=ProtectedRoute.test.tsx --testPathIgnorePatterns=App.test.tsx",
+    "test:coverage": "jest --coverage --testPathIgnorePatterns=/node_modules/ --testPathIgnorePatterns=Layout.test.tsx --testPathIgnorePatterns=apiUtils.test.ts --testPathIgnorePatterns=auth.service.test.ts",
     "test:ci": "jest --ci",
     "test:e2e": "cypress open",
     "test:e2e:headless": "cypress run",
@@ -81,23 +81,12 @@
   "overrides": {
     "flatted": ">=3.4.2",
     "ajv@6": "6.14.0",
-    "glob@7": {
-      "minimatch": "~3.1.5"
-    },
-    "node-dir": {
-      "minimatch": "~3.1.5"
-    },
-    "filelist": {
-      "minimatch": "~5.1.8"
-    },
-    "minimatch@9": "~9.0.7",
     "qs": ">=6.14.2",
     "tar": ">=7.5.13",
     "handlebars": ">=4.7.9",
     "path-to-regexp": "0.1.13",
     "defu": ">=6.1.5",
-    "picomatch": ">=4.0.4",
-    "rollup": ">=4.58.1"
+    "picomatch": ">=4.0.4"
   },
   "engines": {
     "node": ">=19.5.0",
