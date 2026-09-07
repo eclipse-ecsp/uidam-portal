@@ -86,7 +86,7 @@ export const ClientManagement: React.FC = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<ClientListItem | null>(null);
 
-  // Search and status filter (deleted clients are always excluded)
+  // Search and status filter (deleted clients are excluded unless explicitly filtered)
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
