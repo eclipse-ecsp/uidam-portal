@@ -28,6 +28,7 @@ const mockNavigate = jest.fn();
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
   useNavigate: () => mockNavigate,
+  useParams: () => ({ tenantId: 'sdp' }),
 }));
 
 describe('ChangePassword Component', () => {
@@ -99,7 +100,7 @@ describe('ChangePassword Component', () => {
     const cancelButton = screen.getByRole('button', { name: /Cancel/i });
     fireEvent.click(cancelButton);
 
-    expect(mockNavigate).toHaveBeenCalledWith('/uidam/profile');
+    expect(mockNavigate).toHaveBeenCalledWith('/uidam/sdp/profile');
   });
 
   it('should show loading state during API call', async () => {
@@ -161,7 +162,7 @@ describe('ChangePassword Component', () => {
     const backButton = screen.getByRole('button', { name: /Back to Profile/i });
     fireEvent.click(backButton);
 
-    expect(mockNavigate).toHaveBeenCalledWith('/uidam/profile');
+    expect(mockNavigate).toHaveBeenCalledWith('/uidam/sdp/profile');
   });
 
   it('should handle rate limit error', async () => {
