@@ -96,12 +96,16 @@ beforeAll(() => {
       typeof args[0] === 'string' &&
       (args[0].includes('Warning: ReactDOM.render') ||
        args[0].includes('Warning: useLayoutEffect') ||
+       args[0].includes('Warning: An update to') ||
        args[0].includes('Not implemented: HTMLFormElement.prototype.submit') ||
        args[0].includes('User filter API error:') ||
        args[0].includes('Password reset request failed:') ||
        args[0].includes('Failed to decode JWT token:') ||
        args[0].includes('Failed to parse error response:') ||
-       args[0].includes('Failed to fetch user profile in Layout:'))
+       args[0].includes('Failed to fetch user profile in Layout:') ||
+       args[0].includes('Failed to fetch accounts:') ||
+       args[0].includes('Error loading roles:') ||
+       args[0].includes('Error initializing account data:'))
     ) {
       return;
     }

@@ -59,6 +59,7 @@ const renderWithRouter = (component: React.ReactElement) => {
 describe('AccountManagement', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    localStorage.setItem('uidam_token_scopes', 'SelfManage ViewUsers ManageUsers ManageUserRolesAndPermissions ManageAccounts ViewAccounts');
     (AccountService.filterAccounts as jest.Mock).mockResolvedValue({
       success: true,
       data: {

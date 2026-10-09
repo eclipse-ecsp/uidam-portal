@@ -147,8 +147,34 @@ export interface UserMetaDataRequest {
   unique?: boolean;
   readOnly?: boolean;
   searchable?: boolean;
+  dynamicAttribute?: boolean;
   type?: string;
   regex?: string;
+  attributeLabel?: string;
+}
+
+// Metadata describing a user entity field, as returned by GET /v1/users/attributes
+export interface UserAttribute {
+  id?: string;
+  name: string;
+  mandatory: boolean;
+  unique: boolean;
+  readOnly: boolean;
+  searchable: boolean;
+  dynamicAttribute: boolean;
+  type: string;
+  regex?: string;
+  attributeLabel?: string | null;
+  createdBy?: string;
+  createdDate?: string;
+  updatedBy?: string;
+  updatedDate?: string;
+}
+
+// A single stored attribute value for a specific user (user_attribute_values)
+export interface UserAttributeValue {
+  name: string;
+  value: string;
 }
 
 /**
@@ -156,6 +182,49 @@ export interface UserMetaDataRequest {
  * Handles CRUD operations, filtering, status management, and account-role associations
  */
 export class UserService {
+  /**
+   * Decodes the JWT token from localStorage and extracts the user_id claim.
+   * @returns {string | null} The user ID from the token, or null if it cannot be extracted
+   * @throws {Error} If no authentication token is found in localStorage
+   */
+  private static extractUserIdFromToken(): string | null {
+    const token = localStorage.getItem('uidam_admin_token');
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+    let userId: string | null = null;
+    try {
+      const tokenParts = token.split('.');
+      if (tokenParts.length === 3) {
+        const payload = tokenParts[1];
+        const decodedPayload = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+        const claims = JSON.parse(decodedPayload);
+        userId = claims.user_id;
+      }
+    } catch (error) {
+      console.error('Failed to decode JWT token:', error);
+    }
+    return userId;
+  }
+
+  /**
+   * Builds a URL with search query parameters from UserSearchParams.
+   * @param {string} urlPath - The base URL path
+   * @param {UserSearchParams} [params] - Optional pagination and sorting parameters
+   * @returns {string} The final URL with query string appended if params are provided
+   */
+  private static buildFilterUrl(urlPath: string, params?: UserSearchParams): string {
+    const urlParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          urlParams.append(key, value.toString());
+        }
+      });
+    }
+    return urlParams.toString() ? `${urlPath}?${urlParams.toString()}` : urlPath;
+  }
+
   /**
    * Creates a new user using V1 API
    * @param {CreateUserV1Request} user - The user data for creation
@@ -221,19 +290,7 @@ export class UserService {
    * @returns {Promise<ApiResponse<User[]>>} The API response containing filtered users
    */
   static async filterUsersV1(filter: UsersFilterV1, params?: UserSearchParams): Promise<ApiResponse<User[]>> {
-    const urlPath = `${API_CONFIG.API_BASE_URL}/v1/users/filter`;
-    
-    const urlParams = new URLSearchParams();
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined) {
-          urlParams.append(key, value.toString());
-        }
-      });
-    }
-    
-    const finalUrl = urlParams.toString() ? `${urlPath}?${urlParams.toString()}` : urlPath;
-
+    const finalUrl = UserService.buildFilterUrl(`${API_CONFIG.API_BASE_URL}/v1/users/filter`, params);
     const response = await fetchWithTokenRefresh(finalUrl, {
       method: 'POST',
       body: JSON.stringify(filter),
@@ -292,20 +349,7 @@ export class UserService {
    * @throws {Error} If the API request fails or returns an error status
    */
   static async filterUsersV2(filter: UsersFilterV2, params?: UserSearchParams): Promise<User[]> {
-    // Use full URL with API base
-    const urlPath = `${API_CONFIG.API_BASE_URL}/v2/users/filter`;
-    
-    // Add query parameters if provided
-    const urlParams = new URLSearchParams();
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined) {
-          urlParams.append(key, value.toString());
-        }
-      });
-    }
-    
-    const finalUrl = urlParams.toString() ? `${urlPath}?${urlParams.toString()}` : urlPath;
+    const finalUrl = UserService.buildFilterUrl(`${API_CONFIG.API_BASE_URL}/v2/users/filter`, params);
 
     const response = await fetchWithTokenRefresh(finalUrl, {
       method: 'POST',
@@ -461,36 +505,11 @@ export class UserService {
    * @returns {Promise<ApiResponse<User>>} The API response containing the current user's details
    */
   static async getSelfUser(): Promise<ApiResponse<User>> {
-    const token = localStorage.getItem('uidam_admin_token');
-    
-    if (!token) {
-      throw new Error('Authentication token not found');
-    }
-
-    // Decode JWT token to extract user_id
-    let userId: string | null = null;
-    try {
-      // JWT tokens have 3 parts separated by dots: header.payload.signature
-      const tokenParts = token.split('.');
-      if (tokenParts.length === 3) {
-        // Decode the payload (middle part)
-        const payload = tokenParts[1];
-        const decodedPayload = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
-        const claims = JSON.parse(decodedPayload);
-        
-        // Extract user_id from the token claims
-        userId = claims.user_id;
-        console.log('Decoded user_id from token:', userId);
-      }
-    } catch (error) {
-      console.error('Failed to decode JWT token:', error);
-    }
+    const userId = UserService.extractUserIdFromToken();
 
     // Build headers
     const baseHeaders = getApiHeaders();
     const headers: Record<string, string> = {};
-    
-    // Copy headers from baseHeaders
     if (baseHeaders instanceof Headers) {
       baseHeaders.forEach((value, key) => {
         headers[key] = value;
@@ -499,10 +518,8 @@ export class UserService {
       Object.assign(headers, baseHeaders);
     }
 
-    // Add user-id header if we successfully decoded it
     if (userId) {
       headers['user-id'] = userId;
-      console.log('Added user-id header:', userId);
     } else {
       console.warn('Could not extract user_id from token');
     }
@@ -511,7 +528,7 @@ export class UserService {
       method: 'GET',
       headers: headers,
     });
-    
+
     return response.json();
   }
 
@@ -521,30 +538,11 @@ export class UserService {
    * @returns {Promise<ApiResponse<User>>} The API response containing the updated user details
    */
   static async updateSelfUser(patches: JsonPatchOperation[]): Promise<ApiResponse<User>> {
-    const token = localStorage.getItem('uidam_admin_token');
-    
-    if (!token) {
-      throw new Error('Authentication token not found');
-    }
-
-    // Decode JWT token to extract user_id
-    let userId: string | null = null;
-    try {
-      const tokenParts = token.split('.');
-      if (tokenParts.length === 3) {
-        const payload = tokenParts[1];
-        const decodedPayload = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
-        const claims = JSON.parse(decodedPayload);
-        userId = claims.user_id;
-      }
-    } catch (error) {
-      console.error('Failed to decode JWT token:', error);
-    }
+    const userId = UserService.extractUserIdFromToken();
 
     // Build headers
     const baseHeaders = getApiHeaders();
     const headers: Record<string, string> = {};
-    
     if (baseHeaders instanceof Headers) {
       baseHeaders.forEach((value, key) => {
         headers[key] = value;
@@ -553,7 +551,6 @@ export class UserService {
       Object.assign(headers, baseHeaders);
     }
 
-    // Add user-id header
     if (userId) {
       headers['user-id'] = userId;
     }
@@ -585,18 +582,22 @@ export class UserService {
 
   // User Attributes
   /**
-   * Retrieves all available user attribute definitions
-   * @returns {Promise<ApiResponse<any[]>>} The API response containing user attribute metadata
+   * Retrieves all available additional (custom) user attribute definitions
+   * @returns {Promise<ApiResponse<UserAttribute[]>>} The API response containing user attribute metadata
    */
-  static async getUserAttributes(): Promise<ApiResponse<any[]>> { // eslint-disable-line @typescript-eslint/no-explicit-any
-    const response = await fetchWithTokenRefresh(`${API_CONFIG.API_BASE_URL}/v1/users/attributes`, {
+  static async getUserAttributes(): Promise<ApiResponse<UserAttribute[]>> {
+    const response = await fetchWithTokenRefresh(`${API_CONFIG.API_BASE_URL}/v1/users/attributes/additional`, {
       method: 'GET',
     });
-    return response.json();
+    const data = await handleApiResponse<UserAttribute[] | ApiResponse<UserAttribute[]>>(response, 'Get user attributes');
+    // Backend returns a bare array rather than an ApiResponse envelope
+    return Array.isArray(data) ? { data } : data;
   }
 
   /**
-   * Updates or creates user attribute definitions
+   * Creates or updates additional user attribute definitions.
+   * Reused for both adding a new attribute and modifying an existing one —
+   * pass a single-item array to add/update just that attribute.
    * @param {UserMetaDataRequest[]} attributes - Array of user attribute metadata to update
    * @returns {Promise<ApiResponse<any[]>>} The API response containing updated attribute metadata
    */
@@ -605,7 +606,112 @@ export class UserService {
       method: 'PUT',
       body: JSON.stringify(attributes),
     });
-    return response.json();
+    return handleApiResponse<ApiResponse<any[]>>(response, 'Update user attributes'); // eslint-disable-line @typescript-eslint/no-explicit-any
+  }
+
+  /**
+   * Deletes an additional user attribute definition by name
+   * @param {string} attributeName - The name of the attribute to delete
+   * @returns {Promise<ApiResponse<void>>} The API response confirming deletion
+   */
+  static async deleteUserAttribute(attributeName: string): Promise<ApiResponse<void>> {
+    const response = await fetchWithTokenRefresh(
+      `${API_CONFIG.API_BASE_URL}/v1/users/attributes/${encodeURIComponent(attributeName)}`,
+      { method: 'DELETE' }
+    );
+
+    const text = await response.text();
+    if (!response.ok) {
+      let errorMessage = `HTTP error! status: ${response.status}`;
+      try {
+        const errorData = JSON.parse(text);
+        errorMessage = errorData.message || errorData.detail || errorData.title || errorData.Error || errorData.details || errorMessage;
+      } catch {
+        errorMessage = text || errorMessage;
+      }
+      throw new Error(errorMessage);
+    }
+
+    // DELETE commonly returns an empty body (204 No Content); don't attempt to parse it as JSON
+    return text ? JSON.parse(text) : {};
+  }
+
+  // Per-user Attribute Values
+  /**
+   * Retrieves a specific user's stored attribute name/value pairs
+   * @param {string} userId - The unique identifier of the user
+   * @returns {Promise<ApiResponse<UserAttributeValue[]>>} The API response containing the user's attribute values
+   */
+  static async getUserAttributeValues(userId: string): Promise<ApiResponse<UserAttributeValue[]>> {
+    const response = await fetchWithTokenRefresh(`${API_CONFIG.API_BASE_URL}/v1/users/${userId}/attributes/values`, {
+      method: 'GET',
+    });
+
+    const text = await response.text();
+    if (!response.ok) {
+      let errorMessage = `HTTP error! status: ${response.status}`;
+      try {
+        const errorData = JSON.parse(text);
+        errorMessage = errorData.message || errorData.detail || errorData.title || errorData.error || errorMessage;
+      } catch {
+        errorMessage = text || errorMessage;
+      }
+      throw new Error(errorMessage);
+    }
+
+    const data = text ? JSON.parse(text) : [];
+    if (Array.isArray(data)) {
+      return { data };
+    }
+    // Backend may alternatively return a plain name->value map instead of an array of pairs
+    if (data && typeof data === 'object' && !('data' in data)) {
+      return { data: Object.entries(data).map(([name, value]) => ({ name, value: String(value) })) };
+    }
+    return data;
+  }
+
+  /**
+   * Adds or updates a user's attribute values
+   * @param {string} userId - The unique identifier of the user
+   * @param {UserAttributeValue[]} values - Array of name/value pairs to add or update
+   * @returns {Promise<ApiResponse<UserAttributeValue[]>>} The API response containing the updated attribute values
+   */
+  static async updateUserAttributeValues(userId: string, values: UserAttributeValue[]): Promise<ApiResponse<UserAttributeValue[]>> {
+    const convertedBody = Object.fromEntries(
+      values.map(item => [item.name, item.value])
+    );
+    const response = await fetchWithTokenRefresh(`${API_CONFIG.API_BASE_URL}/v1/users/${userId}/attributes/values`, {
+      method: 'PUT',
+      body: JSON.stringify(convertedBody),
+    });
+    return handleApiResponse<ApiResponse<UserAttributeValue[]>>(response, 'Update user attribute values');
+  }
+
+  /**
+   * Deletes a single stored attribute value for a user
+   * @param {string} userId - The unique identifier of the user
+   * @param {string} attributeName - The name of the attribute value to delete
+   * @returns {Promise<ApiResponse<void>>} The API response confirming deletion
+   */
+  static async deleteUserAttributeValue(userId: string, attributeName: string): Promise<ApiResponse<void>> {
+    const response = await fetchWithTokenRefresh(
+      `${API_CONFIG.API_BASE_URL}/v1/users/${userId}/attributes/values/${encodeURIComponent(attributeName)}`,
+      { method: 'DELETE' }
+    );
+
+    const text = await response.text();
+    if (!response.ok) {
+      let errorMessage = `HTTP error! status: ${response.status}`;
+      try {
+        const errorData = JSON.parse(text);
+        errorMessage = errorData.message || errorData.error || errorData.details || errorMessage;
+      } catch {
+        errorMessage = text || errorMessage;
+      }
+      throw new Error(errorMessage);
+    }
+
+    return text ? JSON.parse(text) : {};
   }
 
   // Utility Functions
@@ -644,32 +750,38 @@ export class UserService {
 
   // Password Management
   /**
+   * Resolves a human-readable error message for a failed password-reset HTTP response.
+   * @param {number} status - The HTTP response status code.
+   * @param {object} [errorData] - Optional parsed error body from the response.
+   * @returns {string} A user-friendly error message.
+   */
+  private static getPasswordResetErrorMessage(status: number, errorData?: { message?: string; code?: string }): string {
+    if (errorData?.message) {
+      if (errorData.message.includes('Mail server connection failed') ||
+          errorData.message.includes('SMTP') ||
+          errorData.message.includes('smtp.gmail.com')) {
+        return 'Email service is temporarily unavailable. Please contact your system administrator or try again later.';
+      }
+      if (errorData.code === 'INTERNAL_SERVER_ERROR') {
+        return 'Server error occurred. Please contact your system administrator.';
+      }
+      return errorData.message;
+    }
+    if (status === 429) return 'Too many password reset requests. Please try again later.';
+    if (status === 404) return 'User account not found.';
+    if (status === 400) return 'Invalid request. Please try again.';
+    if (status === 500) return 'Server error occurred. Please contact your system administrator.';
+    return 'Failed to initiate password reset';
+  }
+
+  /**
    * Request password reset for the current user
    * Sends an email with password reset link
    * @returns {Promise<ApiResponse<string>>} Success message
    * @throws {Error} If password reset request fails
    */
   static async requestPasswordReset(): Promise<ApiResponse<string>> {
-    const token = localStorage.getItem('uidam_admin_token');
-    
-    if (!token) {
-      throw new Error('Authentication token not found');
-    }
-
-    // Decode JWT token to extract user_id
-    let userId: string | null = null;
-    try {
-      const tokenParts = token.split('.');
-      if (tokenParts.length === 3) {
-        const payload = tokenParts[1];
-        const decodedPayload = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
-        const claims = JSON.parse(decodedPayload);
-        userId = claims.user_id;
-        console.log('Decoded user_id from token for password reset:', userId);
-      }
-    } catch (error) {
-      console.error('Failed to decode JWT token:', error);
-    }
+    const userId = UserService.extractUserIdFromToken();
 
     // Build headers with user-id
     const headers: Record<string, string> = {
@@ -678,7 +790,6 @@ export class UserService {
 
     if (userId) {
       headers['user-id'] = userId;
-      console.log('Added user-id header for password reset:', userId);
     } else {
       console.warn('Could not extract user_id from token for password reset');
       throw new Error('Failed to extract user ID from authentication token');
@@ -698,37 +809,10 @@ export class UserService {
       try {
         const errorData = await response.json();
         console.error('Password reset request failed:', response.status, errorData);
-        
-        // Check for specific error messages from backend
-        if (errorData.message) {
-          if (errorData.message.includes('Mail server connection failed') || 
-              errorData.message.includes('SMTP') || 
-              errorData.message.includes('smtp.gmail.com')) {
-            errorMessage = 'Email service is temporarily unavailable. Please contact your system administrator or try again later.';
-          } else if (errorData.code === 'INTERNAL_SERVER_ERROR') {
-            errorMessage = 'Server error occurred. Please contact your system administrator.';
-          } else {
-            errorMessage = errorData.message;
-          }
-        } else if (response.status === 429) {
-          errorMessage = 'Too many password reset requests. Please try again later.';
-        } else if (response.status === 404) {
-          errorMessage = 'User account not found.';
-        } else if (response.status === 400) {
-          errorMessage = 'Invalid request. Please try again.';
-        }
+        errorMessage = UserService.getPasswordResetErrorMessage(response.status, errorData);
       } catch (parseError) {
-        // If response is not JSON, try to get text
         console.error('Failed to parse error response:', parseError);
-        if (response.status === 429) {
-          errorMessage = 'Too many password reset requests. Please try again later.';
-        } else if (response.status === 404) {
-          errorMessage = 'User account not found.';
-        } else if (response.status === 400) {
-          errorMessage = 'Invalid request. Please try again.';
-        } else if (response.status === 500) {
-          errorMessage = 'Server error occurred. Please contact your system administrator.';
-        }
+        errorMessage = UserService.getPasswordResetErrorMessage(response.status);
       }
       
       throw new Error(errorMessage);

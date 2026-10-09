@@ -15,7 +15,7 @@
 *
 * <p>SPDX-License-Identifier: Apache-2.0
 ********************************************************************************/
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -91,16 +91,22 @@ export const CreateEditClientModal: React.FC<CreateEditClientModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
+  // Track whether this is the initial mount to avoid a redundant setFormData call
+  // (useState already initialises formData with getDefaultClientData on mount)
+  const isMountedRef = useRef(false);
+
   useEffect(() => {
     if (editMode && client) {
-      // Load client details and populate form
       loadClientDetails(client.clientId);
     }
   }, [editMode, client]);
 
   useEffect(() => {
+    if (!isMountedRef.current) {
+      isMountedRef.current = true;
+      return; // Skip on mount — useState already provides the default value
+    }
     if (!editMode) {
-      // Reset to default for new client
       setFormData(ClientRegistrationService.getDefaultClientData());
     }
   }, [editMode]);
