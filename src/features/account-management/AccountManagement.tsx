@@ -52,6 +52,7 @@ import {
 } from '@mui/icons-material';
 import ManagementLayout from '../../components/shared/ManagementLayout';
 import { StyledTableHead, StyledTableCell, StyledTableRow } from '../../components/shared/StyledTableComponents';
+import { useScopes } from '@hooks/useScopes';
 import { AccountService, Account as ServiceAccount, AccountSearchParams } from '../../services/accountService';
 // Modal components
 import { CreateAccountModal } from './components/CreateAccountModal';
@@ -68,6 +69,9 @@ interface AccountSearchFilters {
 }
 
 export const AccountManagement: React.FC = () => {
+  const { hasScope } = useScopes();
+  const canManageAccounts = hasScope('ManageAccounts');          // POST/PUT/DELETE /accounts
+
   // State management
   const [accounts, setAccounts] = useState<ServiceAccount[]>([]);
   const [loading, setLoading] = useState(false);
@@ -342,14 +346,16 @@ export const AccountManagement: React.FC = () => {
         }}>
           Accounts ({totalCount})
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={handleCreateAccount}
-          disabled={loading}
-        >
-          Create Account
-        </Button>
+        {canManageAccounts && (
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={handleCreateAccount}
+            disabled={loading}
+          >
+            Create Account
+          </Button>
+        )}
       </Box>
 
       {/* Error Display */}
@@ -431,21 +437,25 @@ export const AccountManagement: React.FC = () => {
                       >
                         <ViewIcon fontSize="small" />
                       </IconButton>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleEditAccount(account)}
-                        title="Edit Account"
-                      >
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleDeleteAccount(account)}
-                        title="Delete Account"
-                        color="error"
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
+                      {canManageAccounts && (
+                        <IconButton
+                          size="small"
+                          onClick={() => handleEditAccount(account)}
+                          title="Edit Account"
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                      {canManageAccounts && (
+                        <IconButton
+                          size="small"
+                          onClick={() => handleDeleteAccount(account)}
+                          title="Delete Account"
+                          color="error"
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      )}
                     </Box>
                   </TableCell>
                 </StyledTableRow>

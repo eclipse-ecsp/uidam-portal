@@ -15,7 +15,7 @@
 *
 * <p>SPDX-License-Identifier: Apache-2.0
 ********************************************************************************/
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { ClientRegistrationService } from '../../../services/clientRegistrationService';
 import { ClientFormFields } from './ClientFormFields';
 import { ClientModalWrapper } from './ClientModalWrapper';
@@ -53,18 +53,17 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleCreate = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Validate form data
-      const errors = ClientRegistrationService.validateClientData(formData);
-      if (errors.length > 0) {
-        setValidationErrors(errors);
-        return;
-      }
+  const handleCreate = useCallback(async () => {
+    const errors = ClientRegistrationService.validateClientData(formData);
+    if (errors.length > 0) {
+      setValidationErrors(errors);
+      return;
+    }
 
+    setLoading(true);
+    setError(null);
+
+    try {
       // Create new client
       await ClientRegistrationService.createClient(formData);
       
@@ -82,7 +81,7 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [formData, onSave, onSuccess, resetForm]);
 
   const handleClose = () => {
     // Reset form when closing

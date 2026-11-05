@@ -26,8 +26,8 @@ UIDAM Portal is a React-based web application built with modern technologies inc
 
 ### Prerequisites
 
-1. Node.js version 19.5.0 or higher
-2. npm version 9.0.0 or higher
+1. Node.js 22.12.0 or higher (22.x recommended to match CI), or Node.js 20.19.x
+2. npm version 10.0.0 or higher
 3. Access to running instances of:
    - [UIDAM User Management](https://github.com/eclipse-ecsp/uidam-user-management) service
    - [UIDAM Authorization Server](https://github.com/eclipse-ecsp/uidam-authorization-server) service
@@ -156,6 +156,12 @@ npm run type-check
 
 ## Usage
 
+UI permissions use only the access token's `scopes` array of user permissions.
+Missing, empty, or malformed user scopes grant no permissions; OAuth client
+`scope` values and configured requested scopes are not permission fallbacks.
+Sign out and sign in again after upgrading to replace previously cached scopes.
+Backend authorization remains responsible for enforcing access on every request.
+
 UIDAM Portal provides comprehensive management capabilities for:
 
 ### User Management
@@ -262,7 +268,7 @@ For questions and support, please open an issue on the [GitHub issue tracker](ht
 ### Common Issues
 
 #### Application won't start
-- Ensure Node.js version 18+ is installed
+- Ensure a supported Node.js version is installed (22.x recommended, minimum 22.12.0; Node.js 20.19.x is also supported)
 - Delete `node_modules` and `package-lock.json`, then run `npm install` again
 - Check that all required environment variables are set
 

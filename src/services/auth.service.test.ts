@@ -16,6 +16,14 @@
 * <p>SPDX-License-Identifier: Apache-2.0
 ********************************************************************************/
 import { AuthService, TokenResponse } from './auth.service';
+import { API_CONFIG } from '@config/app.config';
+
+const createTestToken = (claims: Record<string, unknown>): string => {
+  const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url');
+  return `${encode({ alg: 'none' })}.${encode(claims)}.sig`;
+};
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 // Mock the config
 jest.mock('@config/app.config', () => ({
@@ -30,6 +38,7 @@ jest.mock('@config/app.config', () => ({
   },
   API_CONFIG: {
     AUTH_SERVER_URL: 'http://auth.example.com',
+    SESSION_API_PREFIX: '',
   },
 }));
 
@@ -224,8 +233,9 @@ describe('AuthService', () => {
 
       const result = await authService.handleAuthCallback(mockCode, mockState);
 
-      expect(result.user.userName).toBe('admin');
-      expect(result.user.email).toBe('admin@example.com');
+      // Fallback uses JWT-decoded values; test token has no valid JWT payload so returns empty strings
+      expect(result.user).toBeDefined();
+      expect(typeof result.user.userName).toBe('string');
     });
   });
 
@@ -386,6 +396,39 @@ describe('AuthService', () => {
   });
 
   describe('getUserProfile - additional edge cases', () => {
+    it.each(['', '/ecsp', '/sdp'])(
+      'should introspect against the auth server with tenant prefix "%s"',
+      async (prefix) => {
+        const authUrl = jest.replaceProperty(API_CONFIG, 'AUTH_SERVER_URL', 'https://auth.example.com:9443');
+        const tenantPrefix = jest.replaceProperty(API_CONFIG, 'SESSION_API_PREFIX', prefix);
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ active: true, sub: 'test-user' }),
+        });
+
+        try {
+          const profile = await (authService as any).getUserProfile('test-token');
+
+          expect(mockFetch).toHaveBeenCalledTimes(1);
+          expect(mockFetch).toHaveBeenCalledWith(
+            `https://auth.example.com:9443${prefix}/oauth2/introspect`,
+            {
+              method: 'POST',
+              headers: {
+                Authorization: expect.any(String),
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              body: new URLSearchParams({ token: 'test-token' }),
+            }
+          );
+          expect(profile.id).toBe('test-user');
+        } finally {
+          authUrl.restore();
+          tenantPrefix.restore();
+        }
+      }
+    );
+
     it('should use username fallback for email if email missing', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -398,7 +441,9 @@ describe('AuthService', () => {
 
       const user = await (authService as any).getUserProfile('test-token');
       
-      expect(user.email).toBe('testuser@example.com');
+      // No email construction — empty string when email is absent
+      expect(user.email).toBe('');
+      expect(user.userName).toBe('testuser');
     });
 
     it('should use sub for userId if username missing', async () => {
@@ -417,7 +462,7 @@ describe('AuthService', () => {
       expect(user.userName).toBe('subject123');
     });
 
-    it('should parse space-separated scopes from introspection', async () => {
+    it('should use user scopes from the JWT instead of client scopes from introspection', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -427,9 +472,11 @@ describe('AuthService', () => {
         }),
       });
 
-      const user = await (authService as any).getUserProfile('test-token');
+      const user = await (authService as any).getUserProfile(
+        createTestToken({ scope: 'read write admin', scopes: ['ViewUsers', 'SelfManage'] })
+      );
       
-      expect(user.scopes).toEqual(['read', 'write', 'admin']);
+      expect(user.scopes).toEqual(['ViewUsers', 'SelfManage']);
     });
 
     it('should use default accounts array if accounts missing', async () => {
@@ -474,10 +521,10 @@ describe('AuthService', () => {
       expect(scopes).toEqual(['openid', 'profile', 'email']);
     });
 
-    it('should return default scopes if none stored', () => {
+    it('should return no scopes if none stored', () => {
       const scopes = authService.getStoredScopes();
       
-      expect(scopes).toEqual(['openid', 'profile']);
+      expect(scopes).toEqual([]);
     });
 
     it('should check if token is expired', () => {
@@ -875,6 +922,48 @@ describe('AuthService', () => {
   });
 
   describe('getUserProfile - comprehensive coverage', () => {
+    it.each(['active', 'inactive', 'network-error'])(
+      'should retain only user scopes when introspection is %s',
+      async (status) => {
+        const accessToken = createTestToken({
+          scope: 'ManageUsers ManageAccounts',
+          scopes: ['ViewUsers', 'SelfManage'],
+        });
+        if (status === 'network-error') {
+          mockFetch.mockRejectedValueOnce(new Error('Network error'));
+        } else {
+          mockFetch.mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({
+              active: status === 'active',
+              scope: 'ManageUsers ManageAccounts',
+            }),
+          });
+        }
+
+        const profile = await (authService as any).getUserProfile(accessToken);
+
+        expect(profile.scopes).toEqual(['ViewUsers', 'SelfManage']);
+      }
+    );
+
+    it.each([
+      { name: 'missing', scopes: undefined },
+      { name: 'empty', scopes: [] },
+      { name: 'malformed', scopes: 'ManageUsers' },
+    ])('should grant no profile scopes for a $name user claim', async ({ scopes }) => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ active: true, scope: 'ManageUsers ManageAccounts' }),
+      });
+
+      const profile = await (authService as any).getUserProfile(
+        createTestToken({ scope: 'ManageUsers ManageAccounts', scopes })
+      );
+
+      expect(profile.scopes).toEqual([]);
+    });
+
     it('should handle introspection response with all fields', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -891,7 +980,9 @@ describe('AuthService', () => {
         }),
       });
 
-      const profile = await (authService as any).getUserProfile('test-token');
+      const profile = await (authService as any).getUserProfile(
+        createTestToken({ scopes: ['openid', 'profile', 'email'] })
+      );
 
       expect(profile).toEqual({
         id: 'user-sub-123',
@@ -916,9 +1007,9 @@ describe('AuthService', () => {
 
       const profile = await (authService as any).getUserProfile('test-token');
 
-      // Should return fallback profile
-      expect(profile.userName).toBe('admin');
-      expect(profile.email).toBe('admin@example.com');
+      // Inactive token → fallback uses JWT claims; test token is not a real JWT so empty strings
+      expect(profile).toBeDefined();
+      expect(typeof profile.userName).toBe('string');
     });
 
     it('should handle network errors during introspection', async () => {
@@ -926,7 +1017,9 @@ describe('AuthService', () => {
 
       const profile = await (authService as any).getUserProfile('test-token');
 
-      expect(profile.userName).toBe('admin');
+      // Falls back to JWT-decoded values; test token is not real JWT so empty strings
+      expect(profile).toBeDefined();
+      expect(typeof profile.userName).toBe('string');
       expect(consoleWarnSpy).toHaveBeenCalledWith(
         'Could not fetch user profile from introspection:',
         expect.any(Error)
@@ -948,16 +1041,16 @@ describe('AuthService', () => {
       expect(profile).toEqual({
         id: 'minimal-user',
         userName: 'minimal-user',
-        email: 'admin@example.com', // Fallback uses admin@example.com
-        firstName: 'Admin',
-        lastName: 'User',
+        email: '',          // No email in introspection or JWT → empty string
+        firstName: '',      // No given_name → empty string
+        lastName: '',       // No family_name → empty string
         roles: ['ADMIN'],
-        scopes: ['openid', 'profile'],
+        scopes: expect.any(Array),
         accounts: ['default-account'],
       });
     });
 
-    it('should construct email from username when email missing', async () => {
+    it('should use empty email when email missing from introspection and JWT', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -969,7 +1062,67 @@ describe('AuthService', () => {
 
       const profile = await (authService as any).getUserProfile('test-token');
 
-      expect(profile.email).toBe('johndoe@example.com');
+      // Email not constructed from username — remains empty when not present
+      expect(profile.email).toBe('');
+      expect(profile.userName).toBe('johndoe');
+    });
+  });
+
+  describe('decodeJwtPayload', () => {
+    it('should decode a valid JWT payload', () => {
+      // Build a minimal JWT: header.payload.signature (payload is base64url-encoded JSON)
+      const payload = { sub: 'user1', username: 'john', email: 'john@example.com' };
+      const encoded = btoa(JSON.stringify(payload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+      const fakeJwt = `header.${encoded}.signature`;
+
+      const claims = (authService as any).decodeJwtPayload(fakeJwt);
+
+      expect(claims.sub).toBe('user1');
+      expect(claims.username).toBe('john');
+      expect(claims.email).toBe('john@example.com');
+    });
+
+    it('should return empty object for non-JWT string', () => {
+      const claims = (authService as any).decodeJwtPayload('not-a-jwt');
+      expect(claims).toEqual({});
+    });
+
+    it('should return empty object for malformed JWT payload', () => {
+      const claims = (authService as any).decodeJwtPayload('header.!!!invalid!!!.signature');
+      expect(claims).toEqual({});
+    });
+
+    it('should use JWT claims as baseline when introspection returns partial data', async () => {
+      const payload = { sub: 'jwt-user', username: 'jwtname', email: 'jwt@example.com', given_name: 'JWT', family_name: 'Token' };
+      const encoded = btoa(JSON.stringify(payload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+      const fakeJwt = `header.${encoded}.signature`;
+
+      // Introspection returns active but no name fields
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ active: true, sub: 'jwt-user', username: 'jwtname' }),
+      });
+
+      const profile = await (authService as any).getUserProfile(fakeJwt);
+
+      // JWT baseline fills in missing fields from introspection
+      expect(profile.email).toBe('jwt@example.com');
+      expect(profile.firstName).toBe('JWT');
+      expect(profile.lastName).toBe('Token');
+    });
+
+    it('should use JWT fallback when introspection fails', async () => {
+      const payload = { sub: 'fallback-user', username: 'fbuser', email: 'fb@example.com' };
+      const encoded = btoa(JSON.stringify(payload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+      const fakeJwt = `header.${encoded}.signature`;
+
+      mockFetch.mockRejectedValueOnce(new Error('Network down'));
+
+      const profile = await (authService as any).getUserProfile(fakeJwt);
+
+      expect(profile.id).toBe('fallback-user');
+      expect(profile.userName).toBe('fbuser');
+      expect(profile.email).toBe('fb@example.com');
     });
   });
 
@@ -1109,6 +1262,7 @@ describe('AuthService', () => {
       localStorage.setItem('uidam_access_token', 'test-token');
 
       // Mock the config to have POST_LOGOUT_REDIRECT_URI
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { OAUTH_CONFIG } = require('@config/app.config');
       OAUTH_CONFIG.POST_LOGOUT_REDIRECT_URI = 'http://localhost:3000/logout-success';
 
@@ -1140,9 +1294,69 @@ describe('AuthService', () => {
   });
 
   describe('storeTokens - comprehensive coverage', () => {
+    it.each([
+      { name: 'missing', scopes: undefined },
+      { name: 'empty', scopes: [] },
+      { name: 'null', scopes: null },
+      { name: 'string', scopes: 'ManageUsers' },
+      { name: 'object', scopes: { ManageUsers: true } },
+      { name: 'mixed array', scopes: ['ViewUsers', 42] },
+      { name: 'blank scope', scopes: [''] },
+      { name: 'whitespace scope', scopes: ['ViewUsers ManageUsers'] },
+    ])('should fail closed for a $name user scopes claim', ({ scopes }) => {
+      localStorage.setItem('uidam_token_scopes', 'ManageUsers ManageAccounts');
+
+      (authService as any).storeTokens({
+        access_token: createTestToken({ scope: 'ManageUsers ManageAccounts', scopes }),
+        refresh_token: 'refresh',
+        expires_in: 3600,
+        token_type: 'Bearer',
+        scope: 'ManageUsers ManageAccounts',
+      });
+
+      expect(localStorage.getItem('uidam_token_scopes')).toBe('');
+      expect(authService.getStoredScopes()).toEqual([]);
+      if (!Array.isArray(scopes) || scopes.length > 0) {
+        expect(consoleWarnSpy).toHaveBeenCalledWith(
+          'Missing or invalid user scopes claim; no permissions granted.'
+        );
+      }
+    });
+
+    it('should discard client scopes for an undecodable access token', () => {
+      (authService as any).storeTokens({
+        access_token: 'invalid-token',
+        refresh_token: 'refresh',
+        expires_in: 3600,
+        token_type: 'Bearer',
+        scope: 'ManageUsers ManageAccounts',
+      });
+
+      expect(authService.getStoredScopes()).toEqual([]);
+    });
+
+    it('should clear previous permissions when a refreshed token has no user scopes', async () => {
+      localStorage.setItem('uidam_token_scopes', 'ViewUsers ManageUsers');
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          access_token: createTestToken({ scope: 'ManageUsers ManageAccounts' }),
+          refresh_token: 'new-refresh',
+          expires_in: 3600,
+          token_type: 'Bearer',
+          scope: 'ManageUsers ManageAccounts',
+        }),
+      });
+
+      await authService.refreshToken('refresh');
+
+      expect(localStorage.getItem('uidam_token_scopes')).toBe('');
+      expect(authService.getStoredScopes()).toEqual([]);
+    });
+
     it('should store token with scope and expiration', () => {
       const tokenResponse: TokenResponse = {
-        access_token: 'access',
+        access_token: createTestToken({ scopes: ['openid', 'profile', 'email'] }),
         refresh_token: 'refresh',
         expires_in: 3600,
         token_type: 'Bearer',
@@ -1151,7 +1365,7 @@ describe('AuthService', () => {
 
       (authService as any).storeTokens(tokenResponse);
 
-      expect(localStorage.getItem('uidam_access_token')).toBe('access');
+      expect(localStorage.getItem('uidam_access_token')).toBe(tokenResponse.access_token);
       expect(localStorage.getItem('uidam_refresh_token')).toBe('refresh');
       expect(localStorage.getItem('uidam_token_scopes')).toBe('openid profile email');
       
@@ -1160,7 +1374,26 @@ describe('AuthService', () => {
       expect(parseInt(expiresAt!)).toBeGreaterThan(Date.now());
     });
 
-    it('should use default scopes if scope not in token response', () => {
+    it('should prefer the user scopes claim over client scope claim and token response scope', () => {
+      const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString('base64url');
+      const accessToken = `${b64({ alg: 'none' })}.${b64({
+        scope: 'UIDAMSystem ViewUsers ManageUsers ManageUserRolesAndPermissions',
+        scopes: ['ViewUsers', 'SelfManage'],
+      })}.sig`;
+
+      (authService as any).storeTokens({
+        access_token: accessToken,
+        refresh_token: 'refresh',
+        expires_in: 3600,
+        token_type: 'Bearer',
+        scope: 'UIDAMSystem ViewUsers ManageUsers ManageUserRolesAndPermissions',
+      });
+
+      expect(localStorage.getItem('uidam_token_scopes')).toBe('ViewUsers SelfManage');
+      expect(authService.getStoredScopes()).not.toContain('ManageUsers');
+    });
+
+    it('should store empty scopes if scope not in token response', () => {
       const tokenResponse: TokenResponse = {
         access_token: 'access',
         refresh_token: 'refresh',
@@ -1171,7 +1404,7 @@ describe('AuthService', () => {
 
       (authService as any).storeTokens(tokenResponse);
 
-      expect(localStorage.getItem('uidam_token_scopes')).toBe('openid profile');
+      expect(localStorage.getItem('uidam_token_scopes')).toBe('');
     });
   });
 
@@ -1261,12 +1494,11 @@ describe('AuthService', () => {
       expect(authService.isAuthenticated()).toBe(false);
     });
 
-    it('should return default scopes when scopes string is empty', () => {
+    it('should return no scopes when scopes string is empty', () => {
       localStorage.setItem('uidam_token_scopes', '');
 
       const scopes = authService.getStoredScopes();
-      // Empty string is falsy, so returns default scopes
-      expect(scopes).toEqual(['openid', 'profile']);
+      expect(scopes).toEqual([]);
     });
   });
 

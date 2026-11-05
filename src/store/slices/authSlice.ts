@@ -110,7 +110,10 @@ export const authSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+    resetLoading: (state) => {
+      state.isLoading = false;
+    },
   },
 });
 
-export const { loginStart, loginSuccess, loginFailure, logout, updateUser, clearError } = authSlice.actions;
+export const { loginStart, loginSuccess, loginFailure, logout, updateUser, clearError, resetLoading } = authSlice.actions;

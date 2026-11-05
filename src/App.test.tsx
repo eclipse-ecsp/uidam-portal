@@ -85,8 +85,15 @@ jest.mock('@components/ProtectedRoute', () => ({
   default: ({ children }: { children: React.ReactNode }) => <div data-testid="protected-route">{children}</div>,
 }));
 
+// Mock useScopes so DefaultRedirect / DashboardGuard behaviour can be controlled per-test
+jest.mock('@hooks/useScopes', () => ({
+  __esModule: true,
+  useScopes: jest.fn(),
+}));
+
 // Import App AFTER all mocks are set up
 import App from './App';
+import { useScopes } from '@hooks/useScopes';
 
 const createMockStore = (isAuthenticated = false) => {
   return configureStore({
@@ -126,6 +133,141 @@ const createMockStore = (isAuthenticated = false) => {
   });
 };
 
+// ---------------------------------------------------------------------------
+// Helpers shared by the routing tests below
+// ---------------------------------------------------------------------------
+const mockUseScopes = useScopes as jest.Mock;
+
+const scopesMock = (hasAnyFn: (...s: string[]) => boolean, hasFn = (_s: string) => false) =>
+  mockUseScopes.mockReturnValue({
+    scopes: [],
+    hasScope: jest.fn().mockImplementation(hasFn),
+    hasAnyScope: jest.fn().mockImplementation(hasAnyFn),
+  });
+
+// ---------------------------------------------------------------------------
+// DefaultRedirect — picks the first nav item the current user can access
+// ---------------------------------------------------------------------------
+describe('DefaultRedirect', () => {
+  beforeEach(() => {
+    localStorage.setItem('uidam_tenant_id', 'sdp');
+  });
+
+  afterEach(() => {
+    mockUseScopes.mockReset();
+    localStorage.removeItem('uidam_tenant_id');
+    window.history.pushState({}, '', '/');
+  });
+
+  it('redirects to /uidam/users when user has ViewUsers scope', async () => {
+    scopesMock((...s) => s.some(sc => ['ViewUsers', 'ManageUsers'].includes(sc)));
+    render(<App />);
+    await waitFor(() => {
+      expect(screen.getByText('User Management Component')).toBeInTheDocument();
+    });
+  });
+
+  it('redirects to /uidam/dashboard when user has ManageAccounts scope', async () => {
+    scopesMock(
+      (...s) => s.some(sc => ['ViewAccounts', 'ManageAccounts'].includes(sc)),
+      (s) => s === 'ManageAccounts',
+    );
+    render(<App />);
+    await waitFor(() => {
+      expect(screen.getByText('Dashboard Component')).toBeInTheDocument();
+    });
+  });
+
+  it('redirects to /uidam/dashboard when user has TenantAdmin scope', async () => {
+    scopesMock(
+      (...s) => s.some(sc => ['TenantAdmin'].includes(sc)),
+      (s) => s === 'TenantAdmin',
+    );
+    render(<App />);
+    await waitFor(() => {
+      expect(screen.getByText('Dashboard Component')).toBeInTheDocument();
+    });
+  });
+
+  it('redirects to /uidam/accounts when user has only ViewAccounts scope', async () => {
+    scopesMock((...s) => s.some(sc => ['ViewAccounts'].includes(sc)));
+    render(<App />);
+    await waitFor(() => {
+      expect(screen.getByText('Account Management Component')).toBeInTheDocument();
+    });
+  });
+
+  it('redirects to /uidam/roles when user has only role-management scope', async () => {
+    scopesMock((...s) => s.some(sc => sc === 'ManageUserRolesAndPermissions'));
+    render(<App />);
+    await waitFor(() => {
+      expect(screen.getByText('Role Management Component')).toBeInTheDocument();
+    });
+  });
+
+  it('redirects to /login when user has no matching scopes', async () => {
+    scopesMock(() => false);
+    render(<App />);
+    await waitFor(() => {
+      expect(screen.getByText('Login Component')).toBeInTheDocument();
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DashboardGuard — blocks access when feature flag is off, allows when on + ManageAccounts or TenantAdmin
+// ---------------------------------------------------------------------------
+describe('DashboardGuard', () => {
+  beforeEach(() => {
+    localStorage.setItem('uidam_tenant_id', 'sdp');
+  });
+
+  afterEach(() => {
+    mockUseScopes.mockReset();
+    jest.resetModules();
+    localStorage.removeItem('uidam_tenant_id');
+    window.history.pushState({}, '', '/');
+  });
+
+  it('renders dashboard when DASHBOARD feature flag is true and user has ManageAccounts', async () => {
+    window.history.pushState({}, '', '/uidam/sdp/dashboard');
+    // User has ManageAccounts and DASHBOARD flag is true — should render dashboard
+    scopesMock(
+      (...s) => s.some(sc => ['ViewUsers', 'ManageUsers', 'ManageAccounts'].includes(sc)),
+      (s) => s === 'ManageAccounts',
+    );
+    render(<App />);
+    await waitFor(() => {
+      expect(screen.getByText('Dashboard Component')).toBeInTheDocument();
+    });
+  });
+
+  it('renders dashboard when DASHBOARD feature flag is true and user has TenantAdmin', async () => {
+    window.history.pushState({}, '', '/uidam/sdp/dashboard');
+    // User has TenantAdmin and DASHBOARD flag is true — should render dashboard
+    scopesMock(
+      (...s) => s.some(sc => ['TenantAdmin'].includes(sc)),
+      (s) => s === 'TenantAdmin',
+    );
+    render(<App />);
+    await waitFor(() => {
+      expect(screen.getByText('Dashboard Component')).toBeInTheDocument();
+    });
+  });
+
+  it('redirects to /login from /uidam/dashboard when user has no scopes', async () => {
+    window.history.pushState({}, '', '/uidam/sdp/dashboard');
+    scopesMock(() => false, () => false);
+    render(<App />);
+    await waitFor(() => {
+      expect(screen.getByText('Login Component')).toBeInTheDocument();
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Original (skipped) app-level smoke tests
+// ---------------------------------------------------------------------------
 describe.skip('App', () => {
   beforeEach(() => {
     jest.clearAllMocks();

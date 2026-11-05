@@ -15,10 +15,25 @@
 *
 * <p>SPDX-License-Identifier: Apache-2.0
 ********************************************************************************/
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render as rtlRender, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Provider } from 'react-redux';
+import { configureStore } from '@reduxjs/toolkit';
+import { authSlice } from '@store/slices/authSlice';
+import { uiSlice } from '@store/slices/uiSlice';
 import UserManagement from './UserManagement';
 import { UserService, User } from '../../services/userService';
+
+// Wrap component in Redux Provider — required because UserManagement uses useSelector
+const render = (ui: React.ReactElement) => {
+  const testStore = configureStore({
+    reducer: {
+      auth: authSlice.reducer,
+      ui: uiSlice.reducer,
+    },
+  });
+  return rtlRender(<Provider store={testStore}>{ui}</Provider>);
+};
 
 // Mock services
 jest.mock('../../services/userService');
@@ -80,6 +95,16 @@ jest.mock('./components/DeleteUserDialog', () => ({
 // Mock UserService - will be configured in tests
 jest.mock('../../services/userService');
 
+jest.mock('./components/AdminSessionsModal', () => ({
+  __esModule: true,
+  default: ({ open, onClose }: { open: boolean; onClose: () => void }) =>
+    open ? (
+      <div data-testid="admin-sessions-modal">
+        <button onClick={onClose}>Close</button>
+      </div>
+    ) : null,
+}));
+
 jest.mock('./components/ManageUserAccountsModal', () => ({
   __esModule: true,
   default: ({ open, onClose, onSuccess }: { open: boolean; onClose: () => void; onSuccess: (msg: string) => void }) =>
@@ -135,6 +160,7 @@ const mockUsers: User[] = [
 describe('UserManagement', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    localStorage.setItem('uidam_token_scopes', 'SelfManage ViewUsers ManageUsers ManageUserRolesAndPermissions ManageAccounts ViewAccounts');
     (UserService.filterUsersV2 as jest.Mock).mockResolvedValue(mockUsers);
   });
 
@@ -401,7 +427,26 @@ describe('UserManagement', () => {
       });
     });
 
-    it('should clear status filter when selecting "All Status"', async () => {
+    it('should only fetch DELETED users when explicitly selected from the status filter', async () => {
+      const user = userEvent.setup();
+      const statusDropdowns = screen.getAllByRole('combobox');
+      const statusDropdown = statusDropdowns[0];
+      
+      await user.click(statusDropdown);
+      const deletedOption = screen.getByRole('option', { name: 'Deleted' });
+      await user.click(deletedOption);
+      
+      await waitFor(() => {
+        expect(UserService.filterUsersV2 as jest.Mock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            status: ['DELETED']
+          }),
+          expect.any(Object)
+        );
+      });
+    });
+
+    it('should reset to the default status list (excluding Deleted) when selecting "All Status"', async () => {
       const user = userEvent.setup();
       const statusDropdowns = screen.getAllByRole('combobox');
       const statusDropdown = statusDropdowns[0];
@@ -418,8 +463,8 @@ describe('UserManagement', () => {
       
       await waitFor(() => {
         expect(UserService.filterUsersV2 as jest.Mock).toHaveBeenCalledWith(
-          expect.not.objectContaining({
-            status: expect.anything()
+          expect.objectContaining({
+            status: ['ACTIVE', 'PENDING', 'BLOCKED', 'REJECTED', 'DEACTIVATED']
           }),
           expect.any(Object)
         );
@@ -485,7 +530,8 @@ describe('UserManagement', () => {
         expect(UserService.filterUsersV2 as jest.Mock).toHaveBeenCalledWith(
           expect.any(Object),
           expect.objectContaining({
-            pageSize: 10,
+            // One extra row beyond the page size is requested to detect a next page
+            pageSize: 11,
             pageNumber: 0
           })
         );
@@ -545,7 +591,7 @@ describe('UserManagement', () => {
         expect(UserService.filterUsersV2 as jest.Mock).toHaveBeenCalledWith(
           expect.any(Object),
           expect.objectContaining({
-            pageSize: 10,
+            pageSize: 11,
             pageNumber: 0, // Should reset to page 0
           })
         );
@@ -677,6 +723,28 @@ describe('UserManagement', () => {
       await user.click(editButton);
       
       expect(screen.getByTestId('edit-user-modal')).toBeInTheDocument();
+    });
+
+    it('should disable Edit and Delete for an already-deleted user', async () => {
+      const user = userEvent.setup();
+      (UserService.filterUsersV2 as jest.Mock).mockResolvedValue([{ ...mockUsers[0], status: 'DELETED' }]);
+
+      // Deleted users are only fetched/shown when explicitly filtered for
+      const statusDropdowns = screen.getAllByRole('combobox');
+      await user.click(statusDropdowns[0]);
+      await user.click(await screen.findByRole('option', { name: 'Deleted' }));
+
+      await waitFor(() => {
+        expect(screen.getAllByText('testuser1').length).toBeGreaterThan(0);
+      });
+
+      const actionButtons = screen.getAllByRole('button', { name: /actions/i });
+      await user.click(actionButtons[actionButtons.length - 1]);
+
+      const editItem = (await screen.findByText('Edit User')).closest('[role="menuitem"]');
+      const deleteItem = screen.getByText('Delete User').closest('[role="menuitem"]');
+      expect(editItem).toHaveAttribute('aria-disabled', 'true');
+      expect(deleteItem).toHaveAttribute('aria-disabled', 'true');
     });
 
     it('should open edit modal from details modal', async () => {
@@ -933,6 +1001,114 @@ describe('UserManagement', () => {
       
       // Note: The error is shown in snackbar, not as an alert in this implementation
       expect(screen.getByText(/Failed to load users/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('Admin Sessions', () => {
+    beforeEach(async () => {
+      (UserService.filterUsersV2 as jest.Mock).mockResolvedValue(mockUsers);
+      render(<UserManagement />);
+      await waitFor(() => {
+        expect(screen.getByText('testuser1')).toBeInTheDocument();
+      });
+    });
+
+    it('should open admin sessions modal when clicking Manage Active Sessions', async () => {
+      const user = userEvent.setup();
+      const actionButtons = screen.getAllByRole('button', { name: /actions/i });
+
+      await user.click(actionButtons[0]);
+      const sessionsButton = await screen.findByText('Manage Active Sessions');
+      await user.click(sessionsButton);
+
+      expect(screen.getByTestId('admin-sessions-modal')).toBeInTheDocument();
+    });
+
+    it('should close admin sessions modal', async () => {
+      const user = userEvent.setup();
+      const actionButtons = screen.getAllByRole('button', { name: /actions/i });
+
+      await user.click(actionButtons[0]);
+      const sessionsButton = await screen.findByText('Manage Active Sessions');
+      await user.click(sessionsButton);
+
+      expect(screen.getByTestId('admin-sessions-modal')).toBeInTheDocument();
+
+      const closeButton = within(screen.getByTestId('admin-sessions-modal')).getByRole('button', { name: /close/i });
+      await user.click(closeButton);
+
+      expect(screen.queryByTestId('admin-sessions-modal')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Response Format Handling', () => {
+    it('should handle response wrapped in data property', async () => {
+      (UserService.filterUsersV2 as jest.Mock).mockResolvedValue({ data: mockUsers });
+
+      render(<UserManagement />);
+
+      await waitFor(() => {
+        expect(screen.getByText('testuser1')).toBeInTheDocument();
+      });
+    });
+
+    it('detects a next page without a second request when more rows than the page size are returned', async () => {
+      // pageSize sent to the backend is rowsPerPage + 1 (10 + 1 = 11); returning 11 rows signals more exist
+      const fullPagePlusOne = Array.from({ length: 11 }, (_, i) => ({
+        ...mockUsers[0],
+        id: String(i + 1),
+        userName: `pageuser${i + 1}`,
+        email: `pageuser${i + 1}@example.com`,
+      }));
+      (UserService.filterUsersV2 as jest.Mock).mockResolvedValue(fullPagePlusOne);
+
+      render(<UserManagement />);
+
+      await waitFor(() => {
+        expect(screen.getByText('pageuser1')).toBeInTheDocument();
+      });
+
+      // Only rowsPerPage (10) rows are displayed, not the extra probe row
+      expect(screen.queryByText('pageuser11')).not.toBeInTheDocument();
+      // A single request is made per page load — no separate total-count fetch
+      expect((UserService.filterUsersV2 as jest.Mock).mock.calls.length).toBe(1);
+      expect(screen.getByText(/of many/i)).toBeInTheDocument();
+    });
+
+    it('shows the exact total once a page returns fewer rows than the page size', async () => {
+      const partialPage = Array.from({ length: 5 }, (_, i) => ({
+        ...mockUsers[0],
+        id: String(i + 1),
+        userName: `pageuser${i + 1}`,
+        email: `pageuser${i + 1}@example.com`,
+      }));
+      (UserService.filterUsersV2 as jest.Mock).mockResolvedValue(partialPage);
+
+      render(<UserManagement />);
+
+      await waitFor(() => {
+        expect(screen.getByText('pageuser1')).toBeInTheDocument();
+      });
+
+      expect(screen.getByText(/of 5/i)).toBeInTheDocument();
+      const nextPageButton = screen.getByRole('button', { name: /next page/i });
+      expect(nextPageButton).toBeDisabled();
+    });
+
+    it('should handle total count response wrapped in data property', async () => {
+      const fullPageUsers = Array.from({ length: 10 }, (_, i) => ({
+        ...mockUsers[0],
+        id: String(i + 1),
+        userName: `pageuser${i + 1}`,
+        email: `pageuser${i + 1}@example.com`,
+      }));
+      (UserService.filterUsersV2 as jest.Mock).mockResolvedValue({ data: fullPageUsers });
+
+      render(<UserManagement />);
+
+      await waitFor(() => {
+        expect(screen.getByText('pageuser1')).toBeInTheDocument();
+      });
     });
   });
 });

@@ -48,6 +48,8 @@ import {
   Edit as EditIcon,
 } from '@mui/icons-material';
 import { User } from '../../../services/userService';
+import { useScopes } from '@hooks/useScopes';
+import UserAttributeValues from './UserAttributeValues';
 
 interface UserDetailsModalProps {
   open: boolean;
@@ -62,6 +64,8 @@ const UserDetailsModal: React.FC<UserDetailsModalProps> = ({
   onClose,
   onEdit,
 }) => {
+  const { hasScope } = useScopes();
+  const canManageUsers = hasScope('ManageUsers');
   if (!user) return null;
 
   const getStatusColor = (status: string) => {
@@ -92,7 +96,7 @@ const UserDetailsModal: React.FC<UserDetailsModalProps> = ({
       maxWidth="md"
       fullWidth
       PaperProps={{
-        sx: { borderRadius: 2 }
+        sx: { borderRadius: 2 } 
       }}
     >
       <DialogTitle sx={{ 
@@ -371,30 +375,10 @@ const UserDetailsModal: React.FC<UserDetailsModalProps> = ({
             </Card>
           </Grid>
 
-          {/* Additional Attributes */}
-          {user.additionalAttributes && Object.keys(user.additionalAttributes).length > 0 && (
-            <Grid item xs={12}>
-              <Card variant="outlined">
-                <CardContent>
-                  <Typography variant="h6" sx={{ mb: 2, color: 'primary.main' }}>
-                    Additional Attributes
-                  </Typography>
-                  <Grid container spacing={2}>
-                    {Object.entries(user.additionalAttributes).map(([key, value]) => (
-                      <Grid item xs={12} sm={6} md={4} key={key}>
-                        <Typography variant="subtitle2" color="text.secondary">
-                          {key}
-                        </Typography>
-                        <Typography variant="body2">
-                          {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                        </Typography>
-                      </Grid>
-                    ))}
-                  </Grid>
-                </CardContent>
-              </Card>
-            </Grid>
-          )}
+          {/* Per-user Additional Attribute Values */}
+          <Grid item xs={12}>
+            <UserAttributeValues userId={user.id} canEdit={canManageUsers} />
+          </Grid>
         </Grid>
       </DialogContent>
 
@@ -411,6 +395,7 @@ const UserDetailsModal: React.FC<UserDetailsModalProps> = ({
             onClick={onEdit} 
             variant="contained"
             startIcon={<EditIcon />}
+            disabled={!canManageUsers}
           >
             Edit User
           </Button>

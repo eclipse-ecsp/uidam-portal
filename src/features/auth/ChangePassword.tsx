@@ -29,11 +29,12 @@ import {
   Paper
 } from '@mui/material';
 import { LockReset as LockResetIcon } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { UserService } from '@services/userService';
 
 export const ChangePassword: React.FC = () => {
   const navigate = useNavigate();
+  const { tenantId = '' } = useParams<{ tenantId: string }>();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -124,7 +125,7 @@ export const ChangePassword: React.FC = () => {
                     variant="outlined"
                     size="large"
                     fullWidth
-                    onClick={() => navigate('/uidam/profile')}
+                    onClick={() => navigate(`/uidam/${tenantId}/profile`)}
                     disabled={loading}
                   >
                     Cancel
@@ -135,7 +136,7 @@ export const ChangePassword: React.FC = () => {
                   variant="contained"
                   size="large"
                   fullWidth
-                  onClick={() => navigate('/uidam/profile')}
+                  onClick={() => navigate(`/uidam/${tenantId}/profile`)}
                 >
                   Back to Profile
                 </Button>
