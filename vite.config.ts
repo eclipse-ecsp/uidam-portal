@@ -11,6 +11,11 @@ const AUTH_SERVER_TARGET = process.env.VITE_AUTH_SERVER_TARGET || 'https://local
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  optimizeDeps: {
+    esbuildOptions: {
+      target: ['es2020', 'chrome100', 'edge100', 'firefox100', 'safari15'],
+    },
+  },
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
@@ -139,6 +144,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    target: ['es2020', 'chrome100', 'edge100', 'firefox100', 'safari15'],
     rollupOptions: {
       output: {
         manualChunks: {

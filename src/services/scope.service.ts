@@ -24,8 +24,7 @@ import {
   FilterParams,
 } from '@/types';
 import { API_CONFIG } from '@/config/app.config';
-import { createResource, updateResource, deleteResource, getResource, buildQueryParams } from '@/utils/serviceHelpers';
-import { fetchWithTokenRefresh } from './apiUtils';
+import { createResource, updateResource, deleteResource, getResource, fetchPaginatedFilteredResources } from '@/utils/serviceHelpers';
 
 /**
  * Service class for managing scope operations
@@ -39,84 +38,13 @@ export class ScopeService {
    * @throws Error if the API request fails
    */
   async getScopes(params: FilterParams & { filter?: ScopeFilterRequest }): Promise<PaginatedResponse<Scope>> {
-    // Build filter request - backend requires scopes field even if empty
-    const filterRequest: Record<string, string[]> = {
-      scopes: params.filter?.name ? [params.filter.name] : []
-    };
-
-    const queryParams = buildQueryParams({
-      page: params.page,
-      pageSize: params.size,
+    return fetchPaginatedFilteredResources<Scope>({
+      urlPath: `${API_CONFIG.API_BASE_URL}/v1/scopes/filter`,
+      filterKey: 'scopes',
+      filterName: params.filter?.name,
+      params,
+      serviceLabel: 'Scope Service',
     });
-
-    const urlPath = `${API_CONFIG.API_BASE_URL}/v1/scopes/filter`;
-    const finalUrl = queryParams ? `${urlPath}?${new URLSearchParams(queryParams)}` : urlPath;
-
-    const correlationId = crypto.randomUUID();
-    console.log('Scope Service - Getting scopes:', { url: finalUrl, filterRequest, correlationId });
-    
-    try {
-      const response = await fetchWithTokenRefresh(finalUrl, {
-        method: 'POST',
-        headers: {
-          'X-Correlation-ID': correlationId,
-        },
-        body: JSON.stringify(filterRequest),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Scope Service - HTTP error:', { status: response.status, error: errorText, correlationId });
-        throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
-      }
-
-      const data: { results?: Scope[]; messages?: string[] } = await response.json();
-      const results = data.results || [];
-      
-      console.log('Scope Service - Success:', { resultsCount: results.length, correlationId });
-      
-      // Get total count for pagination
-      let totalCount = results.length;
-      
-      // If we got a full page of results, there might be more - fetch total count
-      if (results.length === params.size) {
-        try {
-          const totalResponse = await fetchWithTokenRefresh(`${urlPath}?page=0&pageSize=10000`, {
-            method: 'POST',
-            headers: {
-              'X-Correlation-ID': crypto.randomUUID(),
-            },
-            body: JSON.stringify(filterRequest),
-          });
-          
-          if (totalResponse.ok) {
-            const totalData: { results?: Scope[] } = await totalResponse.json();
-            totalCount = (totalData.results || []).length;
-            console.log('Scope Service - Total count fetched:', totalCount);
-          }
-        } catch (error) {
-          console.warn('Scope Service - Failed to get total count, using current results:', error);
-          // If total count fetch fails, estimate based on current page
-          totalCount = params.page * params.size + results.length;
-        }
-      } else {
-        // Current page has fewer results than requested, so we know the total
-        totalCount = params.page * params.size + results.length;
-      }
-      
-      return {
-        content: results,
-        totalElements: totalCount,
-        totalPages: Math.ceil(totalCount / params.size),
-        size: params.size,
-        number: params.page,
-        first: params.page === 0,
-        last: params.page >= Math.ceil(totalCount / params.size) - 1,
-      };
-    } catch (error: unknown) {
-      console.error('Scope Service - Error details:', { error, correlationId });
-      throw error instanceof Error ? error : new Error('Failed to fetch scopes');
-    }
   }
 
   /**

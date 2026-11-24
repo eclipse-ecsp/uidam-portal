@@ -20,6 +20,7 @@ import { OAUTH_CONFIG, API_CONFIG } from '@config/app.config';
 
 export interface TokenResponse {
   access_token: string;
+  id_token?: string;
   refresh_token: string;
   expires_in: number;
   token_type: string;
@@ -84,6 +85,57 @@ export class AuthService {
   }
 
   /**
+   * Validate that a tenant ID is recognised by the authorization server.
+   * Makes a lightweight request to the auth server's authorize endpoint with
+   * redirect:manual so we can inspect the response without navigating away.
+   *
+   * - If the server responds with a 3xx redirect the tenant is valid.
+   * - If the server returns a JSON body containing TENANT_RESOLUTION_FAILED the
+   *   tenant is invalid and an Error is thrown with a user-readable message.
+   * - If the request fails (CORS, network) validation is skipped and the
+   *   caller falls through to the normal redirect (graceful degradation).
+   *
+   * @param {string} tenantId - The lowercase tenant identifier to validate
+   * @throws {Error} When the auth server explicitly rejects the tenant
+   */
+  async validateTenant(tenantId: string): Promise<void> {
+    const url = `${API_CONFIG.AUTH_SERVER_URL}/${tenantId}/oauth2/authorize`;
+    try {
+      const response = await fetch(url, { redirect: 'manual' });
+
+      // A redirect (opaque) means the tenant was resolved — auth server is
+      // sending the user to the tenant login page as expected.
+      if (response.type === 'opaqueredirect') {
+        return;
+      }
+
+      const text = await response.text();
+      let data: { messages?: Array<{ key: string; parameters?: string[] }> };
+      try {
+        data = JSON.parse(text);
+      } catch {
+        // Non-JSON body — cannot determine validity, proceed optimistically
+        return;
+      }
+
+      const failed = (data?.messages ?? []).find(
+        (m) => m.key === 'TENANT_RESOLUTION_FAILED'
+      );
+      if (failed) {
+        throw new Error(
+          `Tenant "${tenantId.toUpperCase()}" not found. Please enter a valid Tenant ID.`
+        );
+      }
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('not found')) {
+        throw err;
+      }
+      // Network / CORS error — skip pre-validation and proceed with redirect
+      console.warn('Tenant pre-validation unavailable (network/CORS):', err);
+    }
+  }
+
+  /**
    * Initialize OAuth2 Authorization Code Grant flow with PKCE
    * Redirects user to the authorization server
    * @returns {Promise<void>} Redirects to authorization server, does not return
@@ -94,9 +146,10 @@ export class AuthService {
       const state = this.generateState();
       
       // Construct URL with PKCE parameters if enabled
-      const baseUrl = `${API_CONFIG.AUTH_SERVER_URL}/oauth2/authorize`;
+      const baseUrl = `${API_CONFIG.AUTH_SERVER_URL}${API_CONFIG.SESSION_API_PREFIX}/oauth2/authorize`;
       const scopeValue = OAUTH_CONFIG.SCOPES.join(' ');
       
+      // Always include scope= parameter; empty string means server grants default scopes
       let authUrl = `${baseUrl}?response_type=code&client_id=${OAUTH_CONFIG.CLIENT_ID}&redirect_uri=${encodeURIComponent(OAUTH_CONFIG.REDIRECT_URI)}&scope=${encodeURIComponent(scopeValue)}&state=${state}`;
       
       // Add PKCE parameters if enabled
@@ -196,8 +249,8 @@ export class AuthService {
       
       console.log('Token exchange completed, getting user profile...');
       
-      // Get user profile using the access token
-      const userProfile = await this.getUserProfile(tokenResponse.access_token);
+      // Get user profile from the ID token, falling back to the access token
+      const userProfile = await this.getUserProfile(tokenResponse.access_token, tokenResponse.id_token);
       
       console.log('User profile retrieved:', userProfile);
       
@@ -212,7 +265,7 @@ export class AuthService {
           refreshToken: tokenResponse.refresh_token,
           expiresIn: tokenResponse.expires_in,
           tokenType: tokenResponse.token_type,
-          scope: tokenResponse.scope || OAUTH_CONFIG.SCOPES.join(' '),
+          scope: tokenResponse.scope || '',
         },
       };
     } catch (error) {
@@ -267,7 +320,7 @@ export class AuthService {
    */
   private async exchangeCodeForTokens(code: string): Promise<TokenResponse> {
     const formData = this.prepareTokenExchangeFormData(code);
-    const tokenUrl = `${API_CONFIG.AUTH_SERVER_URL}/oauth2/token`;
+    const tokenUrl = `${API_CONFIG.AUTH_SERVER_URL}${API_CONFIG.SESSION_API_PREFIX}/oauth2/token`;
     
     console.log('Token exchange request:', {
       url: tokenUrl,
@@ -325,54 +378,90 @@ export class AuthService {
   }
 
   /**
-   * Get user profile information using token introspection
-   * @param {string} accessToken - The access token to introspect
+   * Check that a decoded JWT payload is a plain JSON object.
+   * @param {unknown} value - The decoded payload
+   * @returns {boolean} True when the value is a non-array object
+   */
+  private isJwtPayload(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+  }
+
+  /**
+   * Decode a JWT token payload without verification.
+   * @param {string} token - The JWT token to decode
+   * @returns {Record<string, unknown>} The decoded payload claims
+   */
+  private decodeJwtPayload(token: string): Record<string, unknown> {
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) {
+        throw new Error('Invalid JWT format');
+      }
+      const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const bytes = Uint8Array.from(
+        atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '=')),
+        (character) => character.charCodeAt(0)
+      );
+      const payload: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+      if (!this.isJwtPayload(payload)) {
+        throw new Error('JWT payload must be an object');
+      }
+      return payload;
+    } catch {
+      console.warn('Failed to decode access-token claims; profile fields will be empty.');
+      return {};
+    }
+  }
+
+  /**
+   * Return the first nonblank string claim from the given names, or '' when none is valid.
+   * @param {Record<string, unknown>} claims - Decoded JWT claims
+   * @param {string[]} names - Claim names in priority order
+   * @returns {string} The claim value or an empty string
+   */
+  private getProfileString(claims: Record<string, unknown>, ...names: string[]): string {
+    for (const name of names) {
+      const value = claims[name];
+      if (typeof value === 'string' && value.trim().length > 0) {
+        return value;
+      }
+      if (value !== undefined && value !== null) {
+        console.warn(`Empty or invalid user ${name} claim; checking the next profile fallback.`);
+      }
+    }
+    return '';
+  }
+
+  private getEffectiveScopes(scopes: unknown): string[] {
+    if (!Array.isArray(scopes) || !scopes.every(
+      (scope: unknown) => typeof scope === 'string' && scope.length > 0 && !/\s/.test(scope)
+    )) {
+      console.warn('Missing or invalid user scopes claim; no permissions granted.');
+      return [];
+    }
+    return scopes.filter((scope: unknown): scope is string => typeof scope === 'string');
+  }
+
+  /**
+   * Build the stored user profile from token claims; the gateway validates tokens.
+   * Each field is taken from the ID token first, then the access token, otherwise left empty.
+   * @param {string} accessToken - The access token to decode
+   * @param {string} [idToken] - The ID token to decode, when the server issued one
    * @returns {Promise<AuthUser>} The user profile information
    */
-  private async getUserProfile(accessToken: string): Promise<AuthUser> {
-    try {
-      const response = await fetch('/oauth2/introspect', { // Use relative URL to go through Vite/nginx proxy
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          token: accessToken,
-        }),
-      });
+  private async getUserProfile(accessToken: string, idToken?: string): Promise<AuthUser> {
+    const idClaims = idToken ? this.decodeJwtPayload(idToken) : {};
+    const accessClaims = this.decodeJwtPayload(accessToken);
+    const pick = (...names: string[]): string => names.reduce(
+      (found, name) => found || this.getProfileString(idClaims, name) || this.getProfileString(accessClaims, name),
+      ''
+    );
 
-      if (response.ok) {
-        const tokenInfo = await response.json();
-        
-        if (tokenInfo.active) {
-          // Extract user information from token introspection
-          return {
-            id: tokenInfo.sub || tokenInfo.username || '1',
-            userName: tokenInfo.username || tokenInfo.sub || 'admin',
-            email: tokenInfo.email || `${tokenInfo.username || 'admin'}@example.com`,
-            firstName: tokenInfo.given_name || 'Admin',
-            lastName: tokenInfo.family_name || 'User', 
-            roles: tokenInfo.roles || ['ADMIN'],
-            scopes: tokenInfo.scope ? tokenInfo.scope.split(' ') : [...OAUTH_CONFIG.SCOPES],
-            accounts: tokenInfo.accounts || ['default-account'],
-          };
-        }
-      }
-    } catch (error) {
-      console.warn('Could not fetch user profile from introspection:', error);
-    }
-
-    // Fallback to basic user info
     return {
-      id: '1',
-      userName: 'admin',
-      email: 'admin@example.com',
-      firstName: 'Admin',
-      lastName: 'User',
-      roles: ['ADMIN'],
-      scopes: [...OAUTH_CONFIG.SCOPES],
-      accounts: ['default-account'],
+      id: pick('sub', 'user_id', 'userId'),
+      userName: pick('username', 'userName', 'sub'),
+      firstName: pick('given_name', 'firstName'),
+      lastName: pick('family_name', 'lastName'),
     };
   }
 
@@ -393,7 +482,7 @@ export class AuthService {
       formData.append('client_secret', OAUTH_CONFIG.CLIENT_SECRET);
     }
 
-    const response = await fetch('/oauth2/token', { // Use relative URL to go through Vite/nginx proxy
+    const response = await fetch(`${API_CONFIG.SESSION_API_PREFIX}/oauth2/token`, { // Use relative URL to go through Vite/nginx proxy
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -428,11 +517,13 @@ export class AuthService {
     
     if (accessToken) {
       try {
-        // Generate state for logout flow
-        const state = Math.random().toString(36).substring(2, 15);
+        // Generate cryptographically secure state for logout flow
+        const stateArray = new Uint8Array(16);
+        crypto.getRandomValues(stateArray);
+        const state = Array.from(stateArray, b => b.toString(16).padStart(2, '0')).join('');
         
         // Construct logout URL with access_token as query parameter
-        const logoutUrl = `${API_CONFIG.AUTH_SERVER_URL}/oauth2/logout?access_token=${encodeURIComponent(accessToken)}`;
+        const logoutUrl = `${API_CONFIG.AUTH_SERVER_URL}${API_CONFIG.SESSION_API_PREFIX}/oauth2/logout?access_token=${encodeURIComponent(accessToken)}`;
         
         // Prepare form data for logout request
         const formData = new URLSearchParams();
@@ -475,9 +566,10 @@ export class AuthService {
     localStorage.setItem(OAUTH_CONFIG.TOKEN_STORAGE_KEY, tokens.access_token);
     localStorage.setItem(OAUTH_CONFIG.REFRESH_TOKEN_STORAGE_KEY, tokens.refresh_token);
     
-    // Store scopes from token response
-    const scopes = tokens.scope || OAUTH_CONFIG.SCOPES.join(' ');
-    localStorage.setItem('uidam_token_scopes', scopes);
+    // Only the JWT `scopes` claim grants user permissions, not OAuth client scopes.
+    const claims = this.decodeJwtPayload(tokens.access_token);
+    const scopeValue = this.getEffectiveScopes(claims.scopes).join(' ');
+    localStorage.setItem('uidam_token_scopes', scopeValue);
     
     // Store expiration time
     const expirationTime = Date.now() + (tokens.expires_in * 1000);
@@ -502,12 +594,12 @@ export class AuthService {
   }
 
   /**
-   * Get stored token scopes
+   * Get stored user scopes; missing grants never fall back to requested OAuth scopes.
    * @returns {string[]} Array of scope strings from stored token
    */
   public getStoredScopes(): string[] {
     const scopes = localStorage.getItem('uidam_token_scopes');
-    return scopes ? scopes.split(' ') : OAUTH_CONFIG.SCOPES;
+    return scopes ? scopes.split(/\s+/).filter(Boolean) : [];
   }
 
   /**

@@ -50,6 +50,7 @@ describe('AuthCallback Component', () => {
     });
     mockNavigate.mockClear();
     mockSearchParams.forEach((_, key) => mockSearchParams.delete(key));
+    localStorage.setItem('uidam_tenant_id', 'sdp');
     
     store = configureStore({
       reducer: {
@@ -64,6 +65,7 @@ describe('AuthCallback Component', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+    localStorage.removeItem('uidam_tenant_id');
   });
 
   const renderComponent = () => {
@@ -106,7 +108,7 @@ describe('AuthCallback Component', () => {
       });
 
       await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith('/uidam/dashboard');
+        expect(mockNavigate).toHaveBeenCalledWith('/uidam/sdp/dashboard');
       });
     });
 

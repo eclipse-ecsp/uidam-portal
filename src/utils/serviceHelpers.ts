@@ -19,7 +19,9 @@
 // Common patterns to reduce code duplication across service files
 
 import { userManagementApi } from '@/services/api-client';
+import { fetchWithTokenRefresh } from '@/services/apiUtils';
 import { handleApiError } from './apiErrorHandler';
+import { PaginatedResponse, FilterParams } from '@/types';
 
 /**
  * Generic create operation helper
@@ -205,4 +207,85 @@ export function buildQueryParams(params: Record<string, string | number | boolea
   });
   
   return queryParams;
+}
+
+/**
+ * Fetches a paginated list of resources via a POST filter endpoint.
+ * Handles total count by fetching all results when a full page is returned.
+ * Shared by RoleService and ScopeService (and similar filter-based pagination patterns).
+ */
+export async function fetchPaginatedFilteredResources<T>(options: {
+  urlPath: string;
+  filterKey: string;
+  filterName: string | undefined;
+  params: FilterParams;
+  serviceLabel: string;
+}): Promise<PaginatedResponse<T>> {
+  const { urlPath, filterKey, filterName, params, serviceLabel } = options;
+  const filterRequest: Record<string, string[]> = {
+    [filterKey]: filterName ? [filterName] : [],
+  };
+
+  const queryParams = buildQueryParams({ page: params.page, pageSize: params.size });
+  const finalUrl = `${urlPath}?${new URLSearchParams(queryParams)}`;
+
+  const correlationId = crypto.randomUUID();
+  console.log(`${serviceLabel} - Getting ${filterKey}:`, { url: finalUrl, filterRequest, correlationId });
+
+  try {
+    const response = await fetchWithTokenRefresh(finalUrl, {
+      method: 'POST',
+      headers: {
+        'X-Correlation-ID': correlationId,
+      },
+      body: JSON.stringify(filterRequest),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`${serviceLabel} - HTTP error:`, { status: response.status, error: errorText, correlationId });
+      throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+    }
+
+    const data: { results?: T[]; messages?: string[] } = await response.json();
+    const results = data.results || [];
+    console.log(`${serviceLabel} - Success:`, { resultsCount: results.length, correlationId });
+
+    let totalCount = results.length;
+    if (results.length === params.size) {
+      try {
+        const totalResponse = await fetchWithTokenRefresh(`${urlPath}?page=0&pageSize=10000`, {
+          method: 'POST',
+          headers: {
+            'X-Correlation-ID': crypto.randomUUID(),
+          },
+          body: JSON.stringify(filterRequest),
+        });
+
+        if (totalResponse.ok) {
+          const totalData: { results?: T[] } = await totalResponse.json();
+          totalCount = (totalData.results || []).length;
+          console.log(`${serviceLabel} - Total count fetched:`, totalCount);
+        }
+      } catch (error) {
+        console.warn(`${serviceLabel} - Failed to get total count, using current results:`, error);
+        totalCount = params.page * params.size + results.length;
+      }
+    } else {
+      totalCount = params.page * params.size + results.length;
+    }
+
+    return {
+      content: results,
+      totalElements: totalCount,
+      totalPages: Math.ceil(totalCount / params.size),
+      size: params.size,
+      number: params.page,
+      first: params.page === 0,
+      last: params.page >= Math.ceil(totalCount / params.size) - 1,
+    };
+  } catch (error: unknown) {
+    console.error(`${serviceLabel} - Error details:`, { error, correlationId });
+    throw error instanceof Error ? error : new Error(`Failed to fetch ${filterKey}`);
+  }
 }

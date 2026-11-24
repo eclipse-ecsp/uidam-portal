@@ -20,6 +20,7 @@ export { UserService } from './userService';
 export { RoleService } from './role.service';
 export { ScopeService } from './scope.service';
 export { AuthService, authService } from './auth.service';
+export { DashboardService } from './dashboardService';
 export { userManagementApi, authServerApi } from './api-client';
 
 // Import services for instances

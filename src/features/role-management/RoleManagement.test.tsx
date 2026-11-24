@@ -173,6 +173,7 @@ describe('RoleManagement', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    localStorage.setItem('uidam_token_scopes', 'SelfManage ViewUsers ManageUsers ManageUserRolesAndPermissions ManageAccounts ViewAccounts');
     
     mockRoleService = {
       getRoles: jest.fn(),
